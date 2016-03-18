@@ -2534,7 +2534,7 @@ class theFrame(wx.Frame):
         global G20_TTY, RX_TTY, LIL_TTY, METER_TTY, MUX_TTY
         global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS
         
-        print 'Selected Device Type: ' + DEVICE_TYPE
+        
 
         ChBx = evt.GetEventObject()
         DT = ChBx.GetLabel()
@@ -2571,6 +2571,7 @@ class theFrame(wx.Frame):
         
         
         DEVICE_TYPE = DT
+        print 'Selected Device Type: ' + DEVICE_TYPE
         
         ERR_STR = self.InitCommPorts()
         
