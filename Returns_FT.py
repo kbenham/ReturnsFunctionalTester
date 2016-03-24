@@ -18,6 +18,8 @@ from threading import Thread
 import serial, wx                   #Non-Core Packages (NEED win32print for Labels too)
 import keygen                       #For Key Write
 import decimal as DEC
+from subprocess import Popen, PIPE
+
 
 
 #----------------------------------------------------------------------
@@ -33,8 +35,13 @@ SECOND_PASS_PLUS = False            # after the first pass don't reload the test
 ZEBRA_LC    = 0                     # Zebra MAC Label Count (how many labels print)
 ZEBRA_DV    = None                  # Zebra Device (opened)
 
+S2_PWR_ON   = "open 1"              # Turn on power to the S2.
+S2_PWR_OFF  = "close 255"           # Turn off power to the S2.
+S2_USB_ON   = "open 2"              # Turn on S2 USB power.
+S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
+
             # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-S2_COMMS    = ['COM86',  None,   'COM77',  None,   None]
+S2_COMMS    = ['COM89',  None,   'COM88',  None,   None]
 S2_C_COMMS  = ['COM86',  None,   'COM77', 'COM6', 'COM76' ]
 M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
 M2_B_COMMS  = ['COM77', 'COM79',  None,   'COM6', 'COM76' ]
@@ -263,7 +270,7 @@ class WorkerThread(Thread):
                       self.RS485, self.S2_C_AutoLed, self.S2_Relay, self.S2_Button1, self.S2_M3_Reset, \
                       self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut ]
         
-        self.S2_Tests = [self.S2_RomBoot, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramM3, self.S2_Pulse, \
+        self.S2_Tests = [self.S2_Pwr_RomBoot, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramM3, self.S2_Pulse, \
                       self.RS485, self.VisualLED, self.S2_Relay, self.S2_Button1, self.S2_M3_Reset, \
                       self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut ]
         
@@ -303,6 +310,8 @@ class WorkerThread(Thread):
             
         #+++++++++++++++++++++++++++++++++++++++
         TestNames = []
+        
+       
         for test in Tests:
             # Get the test name string and build a list to populate the custom tests CheckBoxList
             tmp = str(test)
@@ -312,20 +321,22 @@ class WorkerThread(Thread):
 
         if TEST_STEP == 0:                      #TEST_STEP = 0 => Initialize GUI
             print "GUI Initialization ERROR"
-            
+            return
         
         if errStr == None and TEST_STEP <= len(Tests):  
             
-            if not FIRST_TEST_PASS:
-                print "Doing Test Step %d" % TEST_STEP
-                
-                tmp = str(Tests[(TEST_STEP - 1)])
-                start = tmp.index('WorkerThread.' ) + 13
-                end = tmp.index('of') - 1
-                TestName = tmp[start:end]
-            else: #Debug lines
-                print "lenght of Test: " + str(len(Tests))
-                print "Lenght of CustomTests: " + str(len(CustomTests))
+            #if not FIRST_TEST_PASS:
+            print "Doing Test Step %d" % TEST_STEP
+            
+            tmp = str(Tests[(TEST_STEP - 1)])
+            start = tmp.index('WorkerThread.' ) + 13
+            end = tmp.index('of') - 1
+            TestName = tmp[start:end]
+            #else: #Debug lines
+                #pass
+                #time.sleep(3)
+                #print "lenght of Test: " + str(len(Tests))
+                #print "Lenght of CustomTests: " + str(len(CustomTests))
             
             if not CUST_TEST:
                 Tests[(TEST_STEP - 1)]()
@@ -357,17 +368,22 @@ class WorkerThread(Thread):
             
         #--------------------- check for a fail ------------------ 
         if errStr == 'FAIL BUTTON':     #Operator FAIL
-            self.switchMux('00')        #Power OFF the DUT
+            if DEVICE_TYPE != 'S2':
+                self.switchMux('00')        #Power OFF the DUT
+            else:
+                self.S2_Power(S2_PWR_OFF)
             
         elif errStr != None:            #Automantic FAIL
-            self.switchMux('00')        #Power OFF the DUT
+            
+            if DEVICE_TYPE != 'S2':
+                self.switchMux('00')        #Power OFF the DUT
+            else:
+                self.S2_Power(S2_PWR_OFF)
+                
             wx.PostEvent(self._notify_window, ResultEvent(errStr))
                 
         else:   # the test passed.
             wx.PostEvent(self._notify_window, ResultEvent("%d" % TEST_STEP))
-            
-            
-            
             
     #------------------Method for use by main thread to signal an abort
     def abort(self):
@@ -517,9 +533,25 @@ class WorkerThread(Thread):
             MK_PANEL['Button2'] = "NADA"
     
     #---------------------------------------------------------------------
-    def S2_RomBoot(self):
-        global  errStr
+    def S2_Pwr_RomBoot(self):
+        global  errStr, FIRST_TEST_PASS, S2_PWR_ON
+        
+        if not FIRST_TEST_PASS:
+            return
+        
+        while FIRST_TEST_PASS:                      # wait for the start button to be pressed.
+                time.sleep(1)
+                
         print "Waiting ENDLESSLY for RomBOOT..."
+        print 'Test step = ' + str(TEST_STEP)
+        
+        print 'Turning on S2 power'
+        Rtrn = self.S2_Power(S2_PWR_ON)
+        if Rtrn:
+            errStr = "Fail S2 Power On Failed! \n Try Unplugging & Replugging USB."
+            return 1
+            
+        time.sleep(2)
         bootStat = self.BigRomBoot(0)
         if bootStat != 1:
             if bootStat != -2:              #USER ABORT IS -2
@@ -537,19 +569,45 @@ class WorkerThread(Thread):
         bootStat = self.BigRomBoot(5)
         if bootStat != 1:
             errStr = 'FAIL ON RomBOOT Timeout!'            #Timeout
+    
+    #---------------------------------------------------------------------
+    def S2_Power(self, Action = None):
+        result = 1      # set fail to start
         
+        # Two possible device Id's
+        UnitId1 = ' IGEUN '
+        UnitId2 = ' CNVEJ '
+        Dir = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
+        
+        cmd = Dir + UnitId1 + Action
+        
+        if Action != None:
+            p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
+            p.communicate()
+            result = p.returncode
+            
+            # if the first failed try the next device.
+            if result:
+                cmd = Dir + UnitId2 + Action
+                p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
+                p.communicate()
+                result = p.returncode
+                
+                
+        return result
     
     #---------------------------------------------------------------------
     #   Linux Login
     def LinuxLogin(self):
-        global BOOTLOG, BOOT_T, errStr, USB_PWR_ON
+        global BOOTLOG, BOOT_T, errStr, S2_USB_ON, DEVICE_TYPE
         
-        print "Waiting for RomBOOT..."
-        bootStat = self.BigRomBoot(5)
-        if bootStat != 1:
-            errStr = 'FAIL ON RomBOOT Timeout!'            #Timeout
-            return 1
-        print "RomBOOT received!!"
+        if DEVICE_TYPE != 'S2':
+            print "Waiting for RomBOOT..."
+            bootStat = self.BigRomBoot(5)
+            if bootStat != 1:
+                errStr = 'FAIL ON RomBOOT Timeout!'            #Timeout
+                return 1
+            print "RomBOOT received!!"
         
         timeout = 125
         print "Booting; Waiting " + str(timeout) + "s for Login.."
@@ -609,6 +667,12 @@ class WorkerThread(Thread):
                             errStr = 'FAIL MUX SWITCH POWER ON'
                     else:   # S2 Only!
                         print 'Turning on S2 USB power'
+                        Rtrn = self.S2_Power(S2_USB_ON)
+                        if Rtrn:
+                            errStr = "Fail USB Power Failed! \n Try Unplugging & Replugging USB."
+                            return 1
+                              
+                            
                     
                     time.sleep(3)   # Wait for the USB connect messages to happen.
                     # Add USB power on to Boot log
@@ -947,15 +1011,22 @@ class WorkerThread(Thread):
     # 
     def S2_Pulse(self):
         global errStr, DUT_LOG, G20_C
+        
+        # --- Shawn's comment --- fixes pre 2.5 pulse2 test for old S2s
+        G20_C.write("sed -i 's/time.sleep(1)/time.sleep(4)\\1/'  test/FuncTest/BTL/btlGet2Pulse-FT.py\n")
+        G20_Cgot = ""
+        while G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app# ") == -1:
+            G20_Cgot += G20_C.readall()
+            
         print "Waiting for 2 Pulse Input test..."
         G20_C.flushInput()
-        G20_Cgot = G20_C.read(56)            #Try to read (cd ..\r\nroot@at91sam9g20ek:/var/smallfoot/smallfoot-app# ) for Flash
+        G20_Cgot = G20_C.readall()            #Try to read (cd ..\r\nroot@at91sam9g20ek:/var/smallfoot/smallfoot-app# ) for Flash
         #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
         G20_C.write("python test/FuncTest/BTL/btlGet2Pulse-FT.py\n")
         G20_C.flush()
         #313 for success w/flash (errors should be less) but about 622 with usb from TPS if no flash so just read till Prompt
         while G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app# ") == -1:
-            G20_Cgot += G20_C.read()
+            G20_Cgot += G20_C.readall()
         #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
         if G20_Cgot.rfind("ERROR") != -1 or G20_Cgot.rfind("SUCCESS: PC1") == -1 or G20_Cgot.rfind("SUCCESS: PC2") == -1 :
             errStr = 'FAIL ON LOW SPEED PULSE COUNT'
@@ -1235,8 +1306,8 @@ class WorkerThread(Thread):
         global errStr, DUT_LOG, G20_C
         print "Testing Button1..."
         
-        print "SKipping M2_B_Button1!!! KGB"
-        return
+        #print "SKipping M2_B_Button1!!! KGB"
+        #return
         G20_Cgot = self.SerialPortWrite(G20_C, "ls /var/smallfoot/smallfoot-app/test/FuncTest/BTL/M2_Commish.py\n", 1)
         # do we need to write the file?
         if G20_Cgot.find("No such file or directory") != -1:
@@ -1263,7 +1334,7 @@ class WorkerThread(Thread):
             G20_C.flush()
         
         # run the test!!!
-        print "Waiting for Config Button Asynch on RPC..."
+        print "Waiting for M2_B_Button1 Press..."
         G20_C.flushInput()
         G20_C.write("python test/FuncTest/BTL/M2_Commish.py&\n")
         G20_C.flush()
@@ -1288,9 +1359,10 @@ class WorkerThread(Thread):
     def S2_Button1(self):  
         global errStr, DUT_LOG, G20_C
         
-        print "SKipping S2_Button1!!! KGB"
-        return
-        print "Waiting for Config Button Asynch on RPC..."
+        #print "SKipping S2_Button1!!! KGB"
+        #return
+        #print "Waiting for Config Button Asynch on RPC..."
+        print "Waiting for BUTTON1 Press..."
         G20_C.flushInput()
         G20_C.write("python test/FuncTest/BTL/btlCommish-FT.py&\n")
         G20_C.flush()
@@ -1313,9 +1385,10 @@ class WorkerThread(Thread):
     def S2_M3_Reset(self):
         global errStr, DUT_LOG, LIL_C
         
-        print "SKipping S2_M3_Reset!!! KGB"
-        return
-        print "Waiting for a byte from M3..."
+        #print "SKipping S2_M3_Reset!!! KGB"
+        #return
+        #print "Waiting for a byte from M3..."
+        print "Waiting for M3_RESET Press..."
         LIL_C.flushInput()
         lilCgot = ""
         while len(lilCgot) == 0:            #[TODO test char?? '-'] Wait for userFAIL for M3_RESET Button
@@ -1337,8 +1410,8 @@ class WorkerThread(Thread):
         # RX_RESET Button
         print "Waiting for a byte from RX..."
         
-        print "SKipping RX Reset Button!!! KGB"
-        return
+        #print "SKipping RX Reset Button!!! KGB"
+        #return
         #'''
         RX_C.flushInput()
         rxCgot = ""
@@ -1677,8 +1750,8 @@ class WorkerThread(Thread):
         global errStr, DUT_LOG, DEVICE_TYPE
         print "Waiting ENDLESSLY for RomBOOT..."
         
-        print "KGB --> Skipping G20_Reset test <--KGB"
-        return
+        #print "KGB --> Skipping G20_Reset test <--KGB"
+        #return
     
         bootStat = self.BigRomBoot(0)
         if bootStat != 1:
@@ -1920,14 +1993,21 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def S2_BrownOut(self):
-        global errStr, DUT_LOG, LIL_C, DEVICE_TYPE
+        global errStr, DUT_LOG, LIL_C, DEVICE_TYPE, S2_PWR_OFF, FIRST_TEST_PASS
         
-        if DEVICE_TYPE == "S2_C":
-            print "Turning OFF UUT Power for UV Supply"
-                
+#        if FIRST_TEST_PASS:
+#            return
+#        
+        print "Turning OFF UUT Power for UV Supply"
+        if DEVICE_TYPE == "S2_C": 
             #turn OFF the power
             if self.switchMux('01') != 1:
                 errStr = 'FAIL MUX SWITCH POWER OFF in UV Supply Test'
+                return 1
+        else:
+            Rtrn = self.S2_Power(S2_PWR_OFF)
+            if Rtrn:
+                errStr = "Fail S2 Power Off Failed! \n Try Unplugging & Replugging USB."
                 return 1
    
         print "Waiting ENDLESSLY for UV Supply"
@@ -2182,13 +2262,13 @@ class theFrame(wx.Frame):
         
         y = 10 
         x = 280
-        wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester ' , pos=(x, y), size=(500, 200)) #size=(620, 180))
+        wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester ' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
         #wx.Frame.__init__(self, parent, id, ' EnerNOC M2 CM Tester', pos=(150, 150), size=(500, 200)) #size=(620, 180))
         # Set up event handler for any worker thread results
-        EVT_RESULT(self,self.OnResult)
-        # And indicate we don't have a worker thread yet
-        
-        self.worker = None
+#        EVT_RESULT(self,self.OnResult)
+#        # And indicate we don't have a worker thread yet
+#        
+#        self.worker = None
         
         self.selectDeviceType()
 
@@ -2382,8 +2462,8 @@ class theFrame(wx.Frame):
             Lb_Cnt = ['0','1','2','3','4','5']
             self.LABEL_LIST = wx.ListBox(G_PAN_ID, LB_CNT_ID, (430, 20), (40, 20), Lb_Cnt, wx.LB_SINGLE )
             self.Bind(wx.EVT_LISTBOX, self.OnLabelCountChange, self.LABEL_LIST)
-            if FIRST_TEST_PASS:
-                self.LABEL_LIST.SetSelection(ZEBRA_LC, False) 
+           
+            self.LABEL_LIST.SetSelection(ZEBRA_LC, False) 
             
             
             
@@ -2500,6 +2580,8 @@ class theFrame(wx.Frame):
                 CustTests.SetValue(False)
                 self.ChBxLb.Hide()
        
+       
+       
     def OnLabelCountChange(self, evt):
         global ZEBRA_LC
         
@@ -2519,12 +2601,9 @@ class theFrame(wx.Frame):
         labelCnt = ZEBRA_LC
         ZEBRA_LC = 1
         
-        w = WorkerThread(self)
-        
-        w.PrintZebraLabels()
+        self.Frame_PrintZebraLabels()
         
         ZEBRA_LC = labelCnt
-        w = None
         
          
     #--------------------------------------
@@ -2573,12 +2652,22 @@ class theFrame(wx.Frame):
         DEVICE_TYPE = DT
         print 'Selected Device Type: ' + DEVICE_TYPE
         
+        
+        TEST_STEP = 1
+        
         ERR_STR = self.InitCommPorts()
+
+        # Set up event handler for any worker thread results
+        EVT_RESULT(self,self.OnResult)
+        # And indicate we don't have a worker thread yet
+        
+        self.worker = None
         
         if ERR_STR is not None:
+            TEST_STEP = 0
             self.makePanel("PROGRAM ERROR", ERR_STR, "NADA", "NADA")
         else:
-            TEST_STEP = 1
+            
             self.makePanel("Waiting for Start Button.", "(Click Start button to start test)", "NADA", "START")
     
 
@@ -2762,12 +2851,12 @@ class theFrame(wx.Frame):
     #-------------------------------------------Handler for Fail Button
     def OnFailBtn(self, evt):
         global TEST_STEP, DUT_MAC, EOT_STR, errStr, MUX_C, MUX_VALUE 
-        global TestNames, MK_PANEL, CUST_TEST
+        global TestNames, MK_PANEL, CUST_TEST, DEVICE_TYPE, S2_PWR_OFF
         
         print "You Clicked the Right (FAIL) Button"
-        if self.worker:
-            print "Aborting Worker @ Step %d" % TEST_STEP
-            self.worker.abort()     #Flag the worker thread to stop if running
+#        if self.worker:
+#            print "Aborting Worker @ Step %d" % TEST_STEP
+#            self.worker.abort()     #Flag the worker thread to stop if running
             
         if TestNames[TEST_STEP - 1] == 'VisualLED':
             errStr = "FAIL ON LEDs"
@@ -2779,35 +2868,42 @@ class theFrame(wx.Frame):
             errStr = "FAIL ON Coprocessor RESET Button"
         elif TestNames[TEST_STEP - 1] == 'G20_Reset':
             errStr = "FAIL ON G20 RESET Button"
+        else:
+            print "Test name: " + TestNames[TEST_STEP - 1]
+            errStr = "FAIL for Test " + TestNames[TEST_STEP - 1]
+            
         TEST_STEP = 0
         
         if DUT_MAC != "":
-            if errStr == None:
-                self.makePanel("Test FAILED for %s:" % DUT_MAC, "\n " + EOT_STR, "RESTART", "NADA")
-            else:
-                self.makePanel("Test FAILED for %s:" % DUT_MAC, "\n " + errStr + EOT_STR, "RESTART", "NADA")
+            self.makePanel("Test FAILED for %s:" % DUT_MAC, "\n " + errStr + EOT_STR, "RESTART", "NADA")
         else:
-            if errStr == None:
-                self.makePanel("Test FAILED: ", EOT_STR, "RESTART", "NADA")
-            else:
-                self.makePanel("Test FAILED: ", errStr + EOT_STR, "RESTART", "NADA")
+            self.makePanel("Test FAILED: ", errStr + EOT_STR, "RESTART", "NADA")
        
-        # Turn off the Power.     
-        MUX_C.flushInput()
-        MUX_C.write("00\r")
-        MUX_C.flush()
-        MUX_VALUE = "00"
-        time.sleep(2)   # Make sure the power is OFF.
+        if DEVICE_TYPE != 'S2':
+            # Turn off the Power.     
+            MUX_C.flushInput()
+            MUX_C.write("00\r")
+            MUX_C.flush()
+            MUX_VALUE = "00"
+            time.sleep(2)   # Make sure the power is OFF.
+        else:
+            print 'Turning off S2 power'
+            Rtrn =  self.Frame_S2_Power(S2_PWR_OFF)
+            if Rtrn:
+                errStr = "Fail S2 Power off Failed! \n Try Unplugging & Replugging USB."
+                return 1
     #-------------------------------------------Handler for Pass Button
     def OnPassBtn(self, evt):
         global TEST_STEP, TestNames, MK_PANEL, CUST_TEST
         print "You Clicked the Left (PASS) Button"
         if not self.worker:
             if TestNames[TEST_STEP - 1] == 'VisualLED':
-                DUT_LOG.info( "G20 LEDs Test: All Pass" )
+                DUT_LOG.info( "G20 LEDs Test: Passed" )
                 TEST_STEP += 1
                 if CUST_TEST:
                     MK_PANEL['TstStart'] = "Custom Test Mode!!"
+                elif DEVICE_TYPE == 'S2':
+                    MK_PANEL['TstStart'] = "Testing Relays..."
                 else:
                     MK_PANEL['TstStart'] = "Testing RX<-->G20 COMs..."
                     
@@ -2891,6 +2987,58 @@ class theFrame(wx.Frame):
             os.execl(python, python, *sys.argv)
             
             
+    #---------------------------------------------------------------------
+    #    Print MAC ID Labels
+    def Frame_PrintZebraLabels(self):
+        global  DUT_MAC
+        if ZEBRA_LC:
+            print "ZEBRA GO!!"
+            macNoSepSTR = ""
+            for i in range(0,17):
+                if DUT_MAC[i] != '-':
+                    macNoSepSTR = macNoSepSTR + DUT_MAC[i]
+            labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            printStr = ""
+            for i in range(ZEBRA_LC):
+                printStr = printStr + labelStr
+            #print printStr
+            try:
+                zJob = win32print.StartDocPrinter(ZEBRA_DV, 1, ("MAC Labels", None, "RAW"))
+                win32print.WritePrinter(ZEBRA_DV, printStr)
+                win32print.EndDocPrinter(ZEBRA_DV)
+            except:
+                print 'FAIL ON ZEBRA (call EnerNOC!!)'
+                return
+            print "%d MAC LABELS PRINTED" % ZEBRA_LC
+        else:
+            print "USER SELECTED NO LABELS" 
+            
+    #---------------------------------------------------------------------
+    def Frame_S2_Power(self, Action = None):
+        result = 1      # set fail to start
+        
+        # Two possible device Id's
+        UnitId1 = ' IGEUN '
+        UnitId2 = ' CNVEJ '
+        Dir = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
+        
+        cmd = Dir + UnitId1 + Action
+        
+        if Action != None:
+            p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
+            p.communicate()
+            result = p.returncode
+            
+            # if the first failed try the next device.
+            if result:
+                cmd = Dir + UnitId2 + Action
+                p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
+                p.communicate()
+                result = p.returncode
+                
+                
+        return result
+        
     #---------------------------------------
     def CloseCommPorts(self):
         global TEST_STEP, G20_C, G20_TTY, RX_C, RX_TTY,MUX_C, MUX_TTY,METER_C, METER_TTY, LIL_C, LIL_TTY
@@ -2912,7 +3060,7 @@ class theFrame(wx.Frame):
         
     #------------------------------------------------------------------
     def InitCommPorts(self): 
-        global TEST_STEP, G20_C, G20_TTY, RX_C, RX_TTY,MUX_C, MUX_TTY,METER_C, METER_TTY, LIL_C, LIL_TTY
+        global TEST_STEP, G20_C, G20_TTY, RX_C, RX_TTY,MUX_C, MUX_TTY,METER_C, METER_TTY, LIL_C, LIL_TTY, DEVICE_TYPE
         ERR_STR     = None      
         
         self.CloseCommPorts()
@@ -2987,6 +3135,12 @@ class theFrame(wx.Frame):
                 MUX_C.flush()
                 MUX_VALUE = "00"
                 time.sleep(2)   # Make sure the power is OFF.
+            else:
+                print 'Turning off S2 power'
+                Rtrn =  self.Frame_S2_Power(S2_PWR_OFF)
+                if Rtrn:
+                    ERR_STR = "Fail S2 Power Off Failed! \nTry Unplugging & Replugging USB."
+                   
         else:
             print "COM PORT SETUP FAILD: %s" % ERR_STR
                       
