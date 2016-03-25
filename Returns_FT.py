@@ -19,12 +19,15 @@ import serial, wx                   #Non-Core Packages (NEED win32print for Labe
 import keygen                       #For Key Write
 import decimal as DEC
 from subprocess import Popen, PIPE
+import win32print
 
 
 
 #----------------------------------------------------------------------
 # Tester Globals (UPDATE THIS STUFF TO RUN THE TEST (or use arguments))
 #----------------------------------------------------------------------
+DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
+#DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
@@ -32,7 +35,7 @@ FREQ = 2500
 SOUNDTIME = 1000
 FIRST_TEST_PASS = True              # When the test is started/restarted we need to wait for the Start button to be pressed.
 SECOND_PASS_PLUS = False            # after the first pass don't reload the test list.
-ZEBRA_LC    = 0                     # Zebra MAC Label Count (how many labels print)
+ZEBRA_LC    = 1                     # Zebra MAC Label Count (how many labels print)
 ZEBRA_DV    = None                  # Zebra Device (opened)
 
 S2_PWR_ON   = "open 1"              # Turn on power to the S2.
@@ -44,7 +47,7 @@ S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
 S2_COMMS    = ['COM89',  None,   'COM88',  None,   None]
 S2_C_COMMS  = ['COM86',  None,   'COM77', 'COM6', 'COM76' ]
 M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
-M2_B_COMMS  = ['COM77', 'COM79',  None,   'COM6', 'COM76' ]
+M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
             
 DEVICE_TYPE = 'S2_C'                # S2, M2, S2_C, M2_B 
 
@@ -121,7 +124,7 @@ M2_B_LEDMIN = 2
 M2_B_LEDMAX1 = 0.8
 M2_B_LEDMIN1 = -0.1
 
-M2_B_TestsEnabled = [True, True, True, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False ]
+M2_B_TestsEnabled = [True, True, True, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False ]
 
 M2_B_TEST_SIGNAL = ['+Supply','+52VDC','+12VDC','+3.3VDC','+5VDC','+1VDC','LED1','LED2','LED3','D20_GREEN_LED','D19_RED_LED','VREF','D9_PWR_LED']
 
@@ -146,7 +149,7 @@ M2_B_LIMIT_PWR_LO = {'+Supply':30, '+52VDC':50, '+12VDC':11.8,'+3.3VDC':3.2,\
 # ---------------------- M2 (M341P)--------------------------------------------
 
 M2_TestsEnabled = [True, True, True, True, False, False, False, False, False, False, False, False, \
-            False, False, False, False, False, False, False, False, False, False, False,]
+            False, False, False, False, False, False, False, False, False, False, False, False]
 
 M2_TEST_SIGNAL = ['T1-8','T2-5','+Supply','+12VDC','+5VDC','+3.3VDC','+24VDC','+12V OUT','+1VDC','VREF']
 
@@ -175,7 +178,7 @@ S2_C_LEDMAX = 2.2
 S2_C_LEDMAX1 = 3.1
 S2_C_LEDMIN = 1.7
 
-S2_C_TestsEnabled = [True, True, True, True, False, False, False, False, False, False, False, False, False, False, False, False ]
+S2_C_TestsEnabled = [True, True, True, True, False, False, False, False, False, False, False, False, False, False, False, False, False ]
         
 S2_C_TEST_SIGNAL = ['+52VDC','+5VDC','+3.3VDC','+1VDC','PowerLED','PulseLED1','PulseLED2',\
                'M3_HeartbeatLED','G20_HeartbeatLED','CellLED','LED801','RelayLED1','RelayLED2','GreenLanLED','YellowLanLED']
@@ -195,7 +198,7 @@ S2_C_LIMIT_PWR_LO = {'+52VDC':50,'+5VDC':4.9,'+3.3VDC':3.2,'+1VDC':0.95,'PowerLE
 
 # ---------------------- S2 Rev C2 -------------------------------------------
 
-S2_TestsEnabled = [True, True, True, False, False, False, False, False, False, False, False, False, False, False, False ]
+S2_TestsEnabled = [True, True, True, False, False, False, False, False, False, False, False, False, False, False, False, False ]
 
 
 MK_PANEL = {'TstDone':'Shorts Test Good!!', 'TstStart':'Testing Power Supplies...', 'Botton1':'NADA', 'Button2':'NADA'}
@@ -259,20 +262,20 @@ class WorkerThread(Thread):
         
         self.M2_B_Tests = [self.Shorts, self.PwrSuppliesTest, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramRx, self.VisualLED, self.RxG20Comms, \
                       self.RS485, self.M2_B_RelayContact, self.Rx_EE_Data, self.Rx_Temp, self.Rx_AcReadBrownOut, \
-                      self.M2_B_LED, self.M2_B_Button1, self.Rx_ResetButton, self.EncryptKey, self.WatchDog, self.G20_Reset ]
+                      self.M2_B_LED, self.M2_B_Button1, self.Rx_ResetButton, self.EncryptKey, self.WatchDog, self.G20_Reset, self.PrintZebraLabels ]
         
         self.M2_Tests = [self.Shorts, self.PwrSuppliesTest, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramRx, self.VisualLED, self.RxG20Comms, \
                       self.Rx_ResetButton, self.EncryptKey, self.WatchDog, self.G20_Reset, self.M2_PowerModem, self.M2_Rx_Hv_InOut, self.M2_Rx_DigInOut, \
                       self.M2_AnalogIns, self.Rx_EE_Data, self.Rx_Temp, self.Rx_AcReadBrownOut, \
-                      self.M2_Battery, self.M2_RxRedLED, self.M2_RxGreenLED, self.M2_RxPwrLED]
+                      self.M2_Battery, self.M2_RxRedLED, self.M2_RxGreenLED, self.M2_RxPwrLED, self.PrintZebraLabels ]
         
         self.S2_C_Tests = [self.Shorts, self.PwrSuppliesTest, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramM3, self.S2_C_Pulse, \
                       self.RS485, self.S2_C_AutoLed, self.S2_Relay, self.S2_Button1, self.S2_M3_Reset, \
-                      self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut ]
+                      self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut, self.PrintZebraLabels ]
         
         self.S2_Tests = [self.S2_Pwr_RomBoot, self.LinuxLogin, self.MacId, self.UsbBounce, self.ProgramM3, self.S2_Pulse, \
                       self.RS485, self.VisualLED, self.S2_Relay, self.S2_Button1, self.S2_M3_Reset, \
-                      self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut ]
+                      self.EncryptKey, self.WatchDog, self.G20_Reset, self.S2_BrownOut, self.PrintZebraLabels ]
         
         
         
@@ -353,10 +356,11 @@ class WorkerThread(Thread):
          
          
         #+++++++++++++++++++++++++++++++++++++++
-        elif TEST_STEP == len(Tests) + 2: #or TEST_STEP == len(Test) + 1:          #Last Step :~)
-            print "Test is DONE!!!"
-            DUT_LOG.info("------------ALL TESTS PASSED!!!------------")
-            self.switchMux('00')        #Power OFF the DUT
+        elif TEST_STEP >= len(Tests) + 2 or TEST_STEP <= len(Tests) + 3: #or TEST_STEP == len(Test) + 1:          #Last Step :~)
+            if TEST_STEP == len(Tests) + 2:
+                print "Test is DONE!!!"
+                DUT_LOG.info("------------ALL TESTS PASSED!!!------------")
+                self.switchMux('00')        #Power OFF the DUT
                 
         #+++++++++++++++++++++++++++++++++++++++
         else:
@@ -572,14 +576,14 @@ class WorkerThread(Thread):
     
     #---------------------------------------------------------------------
     def S2_Power(self, Action = None):
+        global DIR
         result = 1      # set fail to start
         
         # Two possible device Id's
         UnitId1 = ' IGEUN '
         UnitId2 = ' CNVEJ '
-        Dir = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
         
-        cmd = Dir + UnitId1 + Action
+        cmd = DIR + UnitId1 + Action
         
         if Action != None:
             p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
@@ -588,7 +592,7 @@ class WorkerThread(Thread):
             
             # if the first failed try the next device.
             if result:
-                cmd = Dir + UnitId2 + Action
+                cmd = DIR + UnitId2 + Action
                 p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
                 p.communicate()
                 result = p.returncode
@@ -981,7 +985,7 @@ class WorkerThread(Thread):
         
         
         #"Inspect G20 LEDs 1, 2, 3 close to U1/G20", "(ALL On or Bliking PASS)", "PASS", "FAIL"
-        MK_PANEL['TstDone'] = "Inspect G20 LEDs 1, 2, 3 close to U1/G20"   
+        MK_PANEL['TstDone'] = "Inspect ALL 9 LEDs"   
         MK_PANEL['TstStart'] = "(ALL On or Bliking PASS)"
         MK_PANEL['Button1'] = "PASS"
         MK_PANEL['Button2'] = "FAIL" 
@@ -2034,7 +2038,7 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def PrintZebraLabels(self):
-        global DUT_LOG, DUT_MAC
+        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV
         if ZEBRA_LC:
             print "ZEBRA GO!!"
             macNoSepSTR = ""
@@ -2393,9 +2397,23 @@ class theFrame(wx.Frame):
         self.sTxt2.SetFont(wx.Font(12, wx.SWISS, wx.NORMAL, wx.BOLD))
         self.sTxt2.SetSize(self.sTxt2.GetBestSize())
         
-        if staticTxt2.find('RX_Button1') != -1:
+        if staticTxt1.find('BUTTON1') != -1:
+            self.sTxt1.SetForegroundColour('#FF00FF') # PINK wx.CYAN)  #Set Text 2 Color For Button1 USER ACTIONs
+        elif staticTxt1.find('M3_RESET') != -1:
+            self.sTxt1.SetForegroundColour('#FF9900') # ORANGE wx.BLACK)  #Set Text 2 Color For RX_RESET USER ACTIONs
+        elif staticTxt1.find('RESET') != -1:
+            self.sTxt1.SetForegroundColour(wx.BLUE)  #Set Text 2 Color For G20_RESET USER ACTIONs
+        elif staticTxt1.find('Inspect') != -1 or staticTxt1.find('Press') != -1 or staticTxt1.find('Un-Power') != -1 :
+            self.sTxt1.SetForegroundColour('#0000FF')  #Set Text 1 Color Blue For USER ACTIONs
+        elif staticTxt1.find('FAIL') != -1:
+            self.sTxt1.SetForegroundColour(wx.RED)   #Set Text 1 Color RED For Failures
+        elif staticTxt1.find('PASSED') != -1:
+            self.sTxt1.SetForegroundColour('#33CC33') #Set Text 1 Color GREEN For good DUTs
+        
+        
+        if staticTxt2.find('Button1') != -1 or staticTxt1.find('BUTTON1') != -1:
             self.sTxt2.SetForegroundColour('#FF00FF') # PINK   #Set Text 2 Color For Button1 USER ACTIONs
-        elif staticTxt2.find('RX_RESET') != -1:
+        elif staticTxt2.find('RX_RESET') != -1 or staticTxt1.find('M3_RESET') != -1:
             self.sTxt2.SetForegroundColour('#FF9900') # ORANGE  #Set Text 2 Color For RX_RESET USER ACTIONs
         elif staticTxt2.find('G20_RESET') != -1:
             self.sTxt2.SetForegroundColour(wx.BLUE)  #Set Text 2 Color For G20_RESET USER ACTIONs
@@ -2405,12 +2423,7 @@ class theFrame(wx.Frame):
         
         G_PAN_ID.SetBackgroundColour('#DCDCDC')                         # bright pink '#DD3388'
         
-        if staticTxt1.find('Inspect') != -1 or staticTxt1.find('Press') != -1 or staticTxt1.find('Un-Power') != -1 :
-            self.sTxt1.SetForegroundColour('#0000FF')  #Set Text 1 Color Blue For USER ACTIONs
-        elif staticTxt1.find('FAIL') != -1:
-            self.sTxt1.SetForegroundColour(wx.RED)   #Set Text 1 Color RED For Failures
-        elif staticTxt1.find('PASSED') != -1:
-            self.sTxt1.SetForegroundColour('#33CC33') #Set Text 1 Color GREEN For good DUTs
+        
             
         #Add Program RX & Write Key Checkboxes if Screen1
         if TEST_STEP == 1:
@@ -2462,8 +2475,8 @@ class theFrame(wx.Frame):
             Lb_Cnt = ['0','1','2','3','4','5']
             self.LABEL_LIST = wx.ListBox(G_PAN_ID, LB_CNT_ID, (430, 20), (40, 20), Lb_Cnt, wx.LB_SINGLE )
             self.Bind(wx.EVT_LISTBOX, self.OnLabelCountChange, self.LABEL_LIST)
-           
-            self.LABEL_LIST.SetSelection(ZEBRA_LC, False) 
+            print 'MAC labels to print = ' + str(ZEBRA_LC)
+            self.LABEL_LIST.SetSelection(ZEBRA_LC, True) 
             
             
             
@@ -2573,6 +2586,7 @@ class theFrame(wx.Frame):
             self.ChBxLb = ChBxLb
             
             self.ChBxLb.SetChecked(SelectedTests)
+            
                      
             if CUST_TEST:
                 CustTests.SetValue(True)
@@ -2940,7 +2954,7 @@ class theFrame(wx.Frame):
         if event.data.rfind("FAIL") != -1 or errStr != None:
             TEST_STEP = 0       #TEST_STEP = 0 => Initialize GUI
             
-            self.CloseCommPorts()
+            #self.CloseCommPorts()
             
             
             print event.data
@@ -2978,7 +2992,7 @@ class theFrame(wx.Frame):
             sX = DEVICE_TYPE
             # self.OnRestartBtn(self)      # TEST ONLY KGB
             
-            self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printed." + EOT_STR, "RESTART", "NADA")
+            self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printed." + EOT_STR, "RESTART", "Re-Print1")
         else:
             print "Unhandled step %d" % TEST_STEP
             self.makePanel("SOFTWARE MALFUNCTION", "ERROR: UNKNOWN STEP", "RESTART", "Next")
@@ -2990,7 +3004,9 @@ class theFrame(wx.Frame):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def Frame_PrintZebraLabels(self):
-        global  DUT_MAC
+        global  DUT_MAC, ZEBRA_DV, ZEBRA_LC
+        
+        
         if ZEBRA_LC:
             print "ZEBRA GO!!"
             macNoSepSTR = ""
@@ -2999,6 +3015,11 @@ class theFrame(wx.Frame):
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             printStr = ""
+            
+            if ZEBRA_DV == None:
+                zebra_name   = win32print.GetDefaultPrinter()
+                ZEBRA_DV = win32print.OpenPrinter(zebra_name)
+            
             for i in range(ZEBRA_LC):
                 printStr = printStr + labelStr
             #print printStr
@@ -3009,20 +3030,21 @@ class theFrame(wx.Frame):
             except:
                 print 'FAIL ON ZEBRA (call EnerNOC!!)'
                 return
-            print "%d MAC LABELS PRINTED" % ZEBRA_LC
+            print "%d MAC LABEL PRINTED" % ZEBRA_LC
         else:
             print "USER SELECTED NO LABELS" 
             
     #---------------------------------------------------------------------
     def Frame_S2_Power(self, Action = None):
+        global DIR
+        
         result = 1      # set fail to start
         
         # Two possible device Id's
         UnitId1 = ' IGEUN '
         UnitId2 = ' CNVEJ '
-        Dir = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
         
-        cmd = Dir + UnitId1 + Action
+        cmd = DIR + UnitId1 + Action
         
         if Action != None:
             p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
@@ -3031,7 +3053,7 @@ class theFrame(wx.Frame):
             
             # if the first failed try the next device.
             if result:
-                cmd = Dir + UnitId2 + Action
+                cmd = DIR + UnitId2 + Action
                 p = Popen(cmd) #, stdout=PIPE, stderr=PIPE)
                 p.communicate()
                 result = p.returncode
@@ -3116,7 +3138,7 @@ class theFrame(wx.Frame):
                       "\nTEST FIXTURE USB MAY NEED to be \r\nPOWERED ON or POWER CYCLED!!!"
         if (RX_C is not None) or (LIL_C is not None) and (G20_C is not None) and ZEBRA_LC:
             try:
-                import win32print
+                
                 zebra_name   = win32print.GetDefaultPrinter()
                 ZEBRA_DV = win32print.OpenPrinter(zebra_name)
                 
