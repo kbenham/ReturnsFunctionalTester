@@ -26,8 +26,8 @@ import win32print
 #----------------------------------------------------------------------
 # Tester Globals (UPDATE THIS STUFF TO RUN THE TEST (or use arguments))
 #----------------------------------------------------------------------
-DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
-#DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
+#DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
+DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
@@ -35,7 +35,7 @@ FREQ = 2500
 SOUNDTIME = 1000
 FIRST_TEST_PASS = True              # When the test is started/restarted we need to wait for the Start button to be pressed.
 SECOND_PASS_PLUS = False            # after the first pass don't reload the test list.
-ZEBRA_LC    = 1                     # Zebra MAC Label Count (how many labels print)
+ZEBRA_LC    = 5                     # Zebra MAC Label Count (how many labels print)
 ZEBRA_DV    = None                  # Zebra Device (opened)
 
 S2_PWR_ON   = "open 1"              # Turn on power to the S2.
@@ -44,7 +44,7 @@ S2_USB_ON   = "open 2"              # Turn on S2 USB power.
 S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
 
             # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-S2_COMMS    = ['COM89',  None,   'COM88',  None,   None]
+S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
 S2_C_COMMS  = ['COM86',  None,   'COM77', 'COM6', 'COM76' ]
 M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
 M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
@@ -57,8 +57,8 @@ LIL_TTY     = S2_C_COMMS[2]         # FTDI to M3 Console (J603: need RX only)
 METER_TTY   = S2_C_COMMS[3]         # Hp Multimeter Com port.
 MUX_TTY     = S2_C_COMMS[4]         # 2 Tracker2's wire as a Mux & several relay for power & ...
 CAN_SKIP    = True                  # Set true to Enable FLASH_RX & KEY-PAIR Checkboxes
-FLASH_COPRO = False                 # Skips Coprocessor Programming if False (CAN_SKIP must be True if not using CL)
-WRITE_KP    = False                 # Skips MAC Key-Pair Association if False (CAN_SKIP must be True)
+FLASH_COPRO = True                  # Skips Coprocessor Programming if False (CAN_SKIP must be True if not using CL)
+WRITE_KP    = True                  # Skips MAC Key-Pair Association if False (CAN_SKIP must be True)
 CUST_TEST   = False                 # start with Custom Tests disabled.
 
 PWR_BIT     = '20'                  # Power on Bit.
@@ -360,7 +360,10 @@ class WorkerThread(Thread):
             if TEST_STEP == len(Tests) + 2:
                 print "Test is DONE!!!"
                 DUT_LOG.info("------------ALL TESTS PASSED!!!------------")
-                self.switchMux('00')        #Power OFF the DUT
+                if DEVICE_TYPE != 'S2':
+                    self.switchMux('00')        #Power OFF the DUT
+                else:
+                    self.S2_Power(S2_PWR_OFF)
                 
         #+++++++++++++++++++++++++++++++++++++++
         else:
@@ -539,6 +542,8 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     def S2_Pwr_RomBoot(self):
         global  errStr, FIRST_TEST_PASS, S2_PWR_ON
+        
+        
         
         if not FIRST_TEST_PASS:
             return
@@ -996,7 +1001,7 @@ class WorkerThread(Thread):
     def RxG20Comms(self):
         global errStr, DUT_LOG, G20_C
         print "Testing RX<-->G20 Communications..."               # previous step to clear before starting test.
-        G20_Cgot = self.SerialPortWrite(G20_C, "python test/RXCommTest.py\n", 1)
+        G20_Cgot = self.SerialPortWrite(G20_C, "python test/RXCommTest.py\n", 2)
         #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
         if G20_Cgot.rfind("ERROR") != -1 or G20_Cgot.rfind("PASS") == -1:
             errStr = 'FAIL RX<-->G20 COM'
@@ -1753,6 +1758,7 @@ class WorkerThread(Thread):
     def G20_Reset(self):
         global errStr, DUT_LOG, DEVICE_TYPE
         print "Waiting ENDLESSLY for RomBOOT..."
+        print "Press/Release G20_RESET Button SW1"
         
         #print "KGB --> Skipping G20_Reset test <--KGB"
         #return
@@ -2038,15 +2044,21 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def PrintZebraLabels(self):
-        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV
+        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV, errStr
         if ZEBRA_LC:
             print "ZEBRA GO!!"
             macNoSepSTR = ""
             for i in range(0,17):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
-            labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            #labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             printStr = ""
+            
+            if ZEBRA_DV == None:
+                zebra_name   = win32print.GetDefaultPrinter()
+                ZEBRA_DV = win32print.OpenPrinter(zebra_name)
+                
             for i in range(ZEBRA_LC):
                 printStr = printStr + labelStr
             #print printStr
@@ -2054,10 +2066,12 @@ class WorkerThread(Thread):
                 zJob = win32print.StartDocPrinter(ZEBRA_DV, 1, ("MAC Labels", None, "RAW"))
                 win32print.WritePrinter(ZEBRA_DV, printStr)
                 win32print.EndDocPrinter(ZEBRA_DV)
+                DUT_LOG.info( "%d MAC LABELS PRINTED" % ZEBRA_LC)
             except:
+                errStr = "FAIL BAR CODE LABEL PRINT"
                 wx.PostEvent(self._notify_window, ResultEvent('FAIL ON ZEBRA (call EnerNOC!!)'))
                 return
-            DUT_LOG.info( "%d MAC LABELS PRINTED" % ZEBRA_LC)
+            
         else:
             DUT_LOG.warning( "USER SELECTED NO LABELS" )
 
@@ -2266,8 +2280,9 @@ class theFrame(wx.Frame):
         
         y = 10 
         x = 280
-        wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester ' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
-        #wx.Frame.__init__(self, parent, id, ' EnerNOC M2 CM Tester', pos=(150, 150), size=(500, 200)) #size=(620, 180))
+        #wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.0' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
+        wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.0' , pos=(0, -1250), size=(500, 200)) #size=(620, 180))
+        
         # Set up event handler for any worker thread results
 #        EVT_RESULT(self,self.OnResult)
 #        # And indicate we don't have a worker thread yet
@@ -2744,8 +2759,26 @@ class theFrame(wx.Frame):
     #--------------------------------------
     # show or don't show CheckBoxList
     def OnCustTest(self, evt):
-        global CUST_TEST, RequiredTests
+        global CUST_TEST, RequiredTests, DEVICE_TYPE
         
+        DT = DEVICE_TYPE
+        
+        if DT == 'S2':
+            ReqTests = S2_TestsEnabled       
+        elif DT == 'S2_C':
+            ReqTests = S2_C_TestsEnabled 
+        elif DT == 'M2':
+            ReqTests = M2_TestsEnabled
+        elif DT == 'M2_B':
+            ReqTests = M2_B_TestsEnabled
+            
+        RequiredTests = [] 
+        cnt = 0
+        for tests in ReqTests:
+            if tests:
+                RequiredTests.append(cnt)
+            cnt += 1
+            
         CUST_TEST = evt.Checked()
         print "You Clicked the Custom Tests.",
         if(CUST_TEST == False):
@@ -2760,11 +2793,24 @@ class theFrame(wx.Frame):
         
         
     def EvtCheckListBox(self, event):
-        global CustomTests, SelectedTests
+        global DEVICE_TYPE, CustomTests, SelectedTests
         index = event.GetSelection()
         label = self.ChBxLb.GetString(index)
         status = ' not'
-        if index < 4:   # is this a Legal test to disable?
+        
+        DT = DEVICE_TYPE
+        ReqTests = []
+        
+        if DT == 'S2':
+            ReqTests = 3   
+        elif DT == 'S2_C':
+            ReqTests = 4
+        elif DT == 'M2':
+            ReqTests = 4
+        elif DT == 'M2_B':
+            ReqTests = 4
+        
+        if index < ReqTests:   # is this a Legal test to disable?
             print 'This is a required setup test!\n'
             print 'Selection denied!\n'
             #self.ChBxLb.SetChecked(RequiredTests)
@@ -2794,7 +2840,7 @@ class theFrame(wx.Frame):
         #Set Text Controls
         
         self.sTxt1.SetLabel("START OF TEST") 
-        self.sTxt2.SetLabel("Testing for Shorts...")
+        #self.sTxt2.SetLabel("Testing...")
         
         tSizer = wx.BoxSizer(wx.HORIZONTAL)
         tSizer.Add(self.sTxt1, 0, wx.ALL | wx.ALIGN_CENTER, 10)
@@ -3013,7 +3059,8 @@ class theFrame(wx.Frame):
             for i in range(0,17):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
-            labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            #labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             printStr = ""
             
             if ZEBRA_DV == None:
@@ -3027,10 +3074,12 @@ class theFrame(wx.Frame):
                 zJob = win32print.StartDocPrinter(ZEBRA_DV, 1, ("MAC Labels", None, "RAW"))
                 win32print.WritePrinter(ZEBRA_DV, printStr)
                 win32print.EndDocPrinter(ZEBRA_DV)
+                print "%d MAC LABEL PRINTED" % ZEBRA_LC
             except:
                 print 'FAIL ON ZEBRA (call EnerNOC!!)'
+                errStr = "FAIL BAR CODE LABEL PRINT"
                 return
-            print "%d MAC LABEL PRINTED" % ZEBRA_LC
+            
         else:
             print "USER SELECTED NO LABELS" 
             
