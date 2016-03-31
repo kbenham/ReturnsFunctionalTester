@@ -18,7 +18,7 @@ from threading import Thread
 import serial, wx                   #Non-Core Packages (NEED win32print for Labels too)
 import keygen                       #For Key Write
 import decimal as DEC
-from subprocess import Popen, PIPE
+from subprocess import Popen
 import win32print
 
 
@@ -45,7 +45,7 @@ S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
 
             # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
 S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
-S2_C_COMMS  = ['COM86',  None,   'COM77', 'COM6', 'COM76' ]
+S2_C_COMMS  = ['COM92',  None,   'COM91', 'COM6', 'COM76' ]
 M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
 M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
             
@@ -67,8 +67,8 @@ MUX_VALUE   = PWR_BIT               # Set the state as if the power only is on.
 UNITS       = ""                    # Meter units VAC OHMS...
 METER_INIT  = False                 # the first time the Program is run init the meter.
 
-S2_M3_VERS  = None                  #S2 Ver 2526"         #Latest S2 Production Version
-Tests       = []                   # Global Test list.
+S2_M3_VERS  = None                  # S2 M3 Version
+Tests       = []                    # Global Test list.
 TestNames   = []                    # Global Test names list
 RequiredTests = [0,1,2,3]           # these tests always need to be Run prior to other tests
 SelectedTests = RequiredTests
@@ -344,11 +344,74 @@ class WorkerThread(Thread):
             if not CUST_TEST:
                 Tests[(TEST_STEP - 1)]()
             elif CustomTests[TEST_STEP -1]:
+                
                 Tests[(TEST_STEP - 1)]()
                 MK_PANEL['TstStart'] = "Custom Test Mode!!"
+                
+                if TEST_STEP <= (len(Tests) - 1): 
+                    # if the next test is M2_B_Button1 & the test is enabled.
+                    if TestNames[TEST_STEP] == 'M2_B_Button1' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release RX_Button1 Button SW4 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                        
+                    # if the next test is S2_Button1 & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'S2_Button1' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release Button1 Button SW1 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                        
+                    # if the next test is S2_M3_Reset & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'S2_M3_Reset' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release M3_RESET Button SW600 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                    
+                    # if the next test is Rx_ResetButton & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'Rx_ResetButton' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release RX_RESET Button SW3 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                    
+                    # if the next test is G20_RESET & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'G20_RESET' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release G20_RESET Button SW100 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL"
+                    
             else:
                 print '\nSkipping --> ' + TestName 
-            
+                
+                if TEST_STEP <= (len(Tests) - 1):
+                    # if the next test is M2_B_Button1 & the test is enabled.
+                    if TestNames[TEST_STEP] == 'M2_B_Button1' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release RX_Button1 Button SW4 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                        
+                    # if the next test is S2_Button1 & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'S2_Button1' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release Button1 Button SW1 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                        
+                    # if the next test is S2_M3_Reset & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'S2_M3_Reset' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release M3_RESET Button SW600 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                    
+                    # if the next test is Rx_ResetButton & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'Rx_ResetButton' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release RX_RESET Button SW3 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL" 
+                    
+                    # if the next test is G20_RESET & the test is enabled.
+                    elif TestNames[TEST_STEP] == 'G20_Reset' and CustomTests[TEST_STEP]:
+                        MK_PANEL['TstDone'] = "Press/Release G20_RESET Button SW100 \n\r Click FAIL if Screen doesn't Change in 5s"
+                        MK_PANEL['Button1'] = "NADA"
+                        MK_PANEL['Button2'] = "FAIL"
         
         #+++++++++++++++++++++++++++++++++++++++
         elif TEST_STEP == len(Tests) + 1:    
@@ -373,14 +436,8 @@ class WorkerThread(Thread):
             python = sys.executable
             os.execl(python, python, *sys.argv)
             
-        #--------------------- check for a fail ------------------ 
-        if errStr == 'FAIL BUTTON':     #Operator FAIL
-            if DEVICE_TYPE != 'S2':
-                self.switchMux('00')        #Power OFF the DUT
-            else:
-                self.S2_Power(S2_PWR_OFF)
-            
-        elif errStr != None:            #Automantic FAIL
+        #--------------------- check for a fail ------------------    
+        if errStr != None:            #Automantic FAIL
             
             if DEVICE_TYPE != 'S2':
                 self.switchMux('00')        #Power OFF the DUT
@@ -388,6 +445,7 @@ class WorkerThread(Thread):
                 self.S2_Power(S2_PWR_OFF)
                 
             wx.PostEvent(self._notify_window, ResultEvent(errStr))
+            DUT_LOG.error( errStr )
                 
         else:   # the test passed.
             wx.PostEvent(self._notify_window, ResultEvent("%d" % TEST_STEP))
@@ -701,7 +759,7 @@ class WorkerThread(Thread):
     #       Get MAC ID 
     def MacId(self):
         global CURRENT_LOG, BOOTLOG, BOOT_T, DUT_MAC
-        global DUT_LOG, TEMP_LOG, errStr, G20_C
+        global DUT_LOG, TEMP_LOG, errStr, G20_C, DEVICE_TYPE
         
         #TEST_STEP = 3 => MAC & Bootlog Verification
         #MAC Test
@@ -730,12 +788,14 @@ class WorkerThread(Thread):
             #Start Logging to File (if not doing so already)
             if CURRENT_LOG is None:
                 DUT_LOG.setLevel(logging.INFO)
-                CURRENT_LOG = logging.FileHandler( "M2_TestLogs/%s.log" % DUT_MAC )
+                FILENAME = DEVICE_TYPE + "_" + DUT_MAC
+                CURRENT_LOG = logging.FileHandler( "ReturnsTestLogs/%s.log" % FILENAME )
                 CURRENT_LOG.formatter = logging.Formatter("%(asctime)s  %(message)s")
                 DUT_LOG.addHandler( CURRENT_LOG )
                 print "Got A MAC started logging to M2_TestLogs/%s.log" % DUT_MAC
                 DUT_LOG.info(TEMP_LOG)                          # put the Shorts & Power tests in first
                 DUT_LOG.info( "%s TEST LOG" % DUT_MAC )
+                DUT_LOG.info( "Device Type: %s" % DEVICE_TYPE )
                 DUT_LOG.info( "Linux Boot Time: %d seconds" % BOOT_T)
             else:
                 print "STILL LOGGING WTF?? NO LOG FOR DUT!!!!!!"
@@ -835,75 +895,76 @@ class WorkerThread(Thread):
                     return 1
                 binName = G20_Cgot[ (m3BinIndex) : (m3BinIndex + 18) ] #btl_combo_NNNN.bin
                 S2_M3_VERS = G20_Cgot[ (m3BinIndex + 10) : (m3BinIndex + 14) ] # NNNN
+                print "SD-CARD M3 Version: " + S2_M3_VERS
             
-                # Check the Version on the processor before we do anything.
-                G20_Cgot = self.SerialPortWrite(G20_C, "python test/FuncTest/BTL/btlGetHwVersion-FT.py\n", 5)
-                VerIndex = G20_Cgot.rfind("Ver ")
-                versStr = G20_Cgot[ (VerIndex + 4) : (VerIndex + 8) ]
+#                # Check the Version on the processor before we do anything.
+#                G20_Cgot = self.SerialPortWrite(G20_C, "python test/FuncTest/BTL/btlGetHwVersion-FT.py\n", 5)
+#                VerIndex = G20_Cgot.rfind("Ver ")
+#                versStr = G20_Cgot[ (VerIndex + 4) : (VerIndex + 8) ]
 #                print "Version CMD = " + versStr
 #                print "File Version = " + S2_M3_VERS
                 # if the version isn't right reprogram it.
-                if S2_M3_VERS != versStr:
-                    print "Moving to utils..."
-                    G20_Cgot = self.SerialPortWrite(G20_C, "cd utils\n")
-                    if G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#") == -1:
-                        errStr = 'FAIL ON SD FS moving to utils (REPLACE CARD?)'
-                
-                    output = ""
-                    DUT_LOG.info( "Erasing M3..." )
-                    #print "Doing Erase..."
-                    timeOut = time.time() + 20
-                    G20_Cgot = self.SerialPortWrite(G20_C,"python m3loader.py -e\n",1)
-                    while time.time() < timeOut:
-                        G20_Cgot += G20_C.read()
-                        #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
-                        if G20_Cgot.find( "root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#" ) != -1:
-                            break
-                    else:
-                        errStr = 'FAIL ON M3 ERASE TIMEOUT'
-                        DUT_LOG.error( "Erase M3 Timeout:\n%s" % output )
-                        return 1
-                        
-                    DUT_LOG.info( "Erase M3 took %d seconds" % (time.time() - (timeOut - 20)) )
-
-                    DUT_LOG.info( "Programming M3..." )
-                    #print "Doing Program..."
-                    timeOut = time.time() + 60
-                    G20_Cgot = self.SerialPortWrite(G20_C,"python m3loader.py -a 0x08000000 -f /var/smallfoot/littletoe/" + binName + "\n", 1)
-                    while time.time() < timeOut:
-                        G20_Cgot += G20_C.read()
-                        #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
-                        if G20_Cgot.find( "root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#" ) != -1:
-                            break
-                    else:
-                        errStr =  'FAIL ON PROGRAM M3 TIMEOUT'
-                        DUT_LOG.error( "Prog M3 Timeout:\n%s" % output )
-                        return 1
-                    #print "[%d]:%s" % (len(output), output)
-                    if output.rfind("Errno") != -1 or output.rfind("Traceback") != -1:
-                        errStr = 'FAIL ON PROGRAM M3 ERROR'
-                        DUT_LOG.error( "Prog M3 FAIL:\n%s" % output )
-                        return 1
-                    DUT_LOG.info( "M3 Programming took %d seconds" % (time.time() - (timeOut - 60)) )
-                    lilCgot = LIL_C.read(650)   #Read enough to get version and ID
-                    #print "[%d]:%s" % (len(lilCgot), lilCgot)
-                    m3IdIndex = lilCgot.rfind( "Image 1 is a good image" )
-                    if ( m3IdIndex ) == -1:
-                        errStr = 'FAIL ON M3 message IMAGE 1 GOOD'
-                        DUT_LOG.error( "No Image 1 Good Message:\n%s" % lilCgot )
-                        return 1
-                    else:
-                        #m3IdStr = lilCgot[ (m3IdIndex+6) : (m3IdIndex+6+8) ]    #+6 for "ID: 0x" +8 for HHHHHHHH
-                        DUT_LOG.info( "Got M3 Image 1 Good Message!")
-                   
-                    print "Moving back to smallfoot-app..."
-                    G20_C.write("cd ..\n")
-                    G20_C.flush()
-                    MK_PANEL['TstDone'] = "Program M3 Good!! Please Wait..."
-                    
-                # M3 Firmware version is current  
+#               if S2_M3_VERS != versStr:
+                print "Moving to utils..."
+                G20_Cgot = self.SerialPortWrite(G20_C, "cd utils\n")
+                if G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#") == -1:
+                    errStr = 'FAIL ON SD FS moving to utils (REPLACE CARD?)'
+            
+                output = ""
+                DUT_LOG.info( "Erasing M3..." )
+                #print "Doing Erase..."
+                timeOut = time.time() + 20
+                G20_Cgot = self.SerialPortWrite(G20_C,"python m3loader.py -e\n",1)
+                while time.time() < timeOut:
+                    G20_Cgot += G20_C.read()
+                    #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
+                    if G20_Cgot.find( "root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#" ) != -1:
+                        break
                 else:
-                    MK_PANEL['TstDone'] = "M3 Version is " + versStr + " skipping program!"
+                    errStr = 'FAIL ON M3 ERASE TIMEOUT'
+                    DUT_LOG.error( "Erase M3 Timeout:\n%s" % output )
+                    return 1
+                    
+                DUT_LOG.info( "Erase M3 took %d seconds" % (time.time() - (timeOut - 20)) )
+
+                DUT_LOG.info( "Programming M3..." )
+                #print "Doing Program..."
+                timeOut = time.time() + 60
+                G20_Cgot = self.SerialPortWrite(G20_C,"python m3loader.py -a 0x08000000 -f /var/smallfoot/littletoe/" + binName + "\n", 1)
+                while time.time() < timeOut:
+                    G20_Cgot += G20_C.read()
+                    #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
+                    if G20_Cgot.find( "root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#" ) != -1:
+                        break
+                else:
+                    errStr =  'FAIL ON PROGRAM M3 TIMEOUT'
+                    DUT_LOG.error( "Prog M3 Timeout:\n%s" % output )
+                    return 1
+                #print "[%d]:%s" % (len(output), output)
+                if output.rfind("Errno") != -1 or output.rfind("Traceback") != -1:
+                    errStr = 'FAIL ON PROGRAM M3 ERROR'
+                    DUT_LOG.error( "Prog M3 FAIL:\n%s" % output )
+                    return 1
+                DUT_LOG.info( "M3 Programming took %d seconds" % (time.time() - (timeOut - 60)) )
+                lilCgot = LIL_C.read(650)   #Read enough to get version and ID
+                #print "[%d]:%s" % (len(lilCgot), lilCgot)
+                m3IdIndex = lilCgot.rfind( "Image 1 is a good image" )
+                if ( m3IdIndex ) == -1:
+                    errStr = 'FAIL ON M3 message IMAGE 1 GOOD'
+                    DUT_LOG.error( "No Image 1 Good Message:\n%s" % lilCgot )
+                    return 1
+                else:
+                    #m3IdStr = lilCgot[ (m3IdIndex+6) : (m3IdIndex+6+8) ]    #+6 for "ID: 0x" +8 for HHHHHHHH
+                    DUT_LOG.info( "Got M3 Image 1 Good Message!")
+               
+                print "Moving back to smallfoot-app..."
+                G20_C.write("cd ..\n")
+                G20_C.flush()
+                MK_PANEL['TstDone'] = "Program M3 Good!! Please Wait..."
+                    
+#                # M3 Firmware version is current  
+#                else:
+#                    MK_PANEL['TstDone'] = "M3 Version is " + versStr + " skipping program!"
                 
         else:
             #print "DANGER DANGER Skipping Programming M3 Step!!"
@@ -1304,7 +1365,7 @@ class WorkerThread(Thread):
             else: DUT_LOG.info( TEMP_LOG )     
         
         MK_PANEL['TstDone'] = "LEDs Test Good!!"    
-        MK_PANEL['TstStart'] = "Press/Release RX_Button1 Button SW4 \n\r Click FAIL if Sceen doesn't Change in 5s"
+        MK_PANEL['TstStart'] = "Press/Release RX_Button1 Button SW4 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL" 
         
@@ -1360,7 +1421,7 @@ class WorkerThread(Thread):
           
         
         MK_PANEL['TstDone'] = "Button1 Test Good!!"   
-        MK_PANEL['TstStart'] = "Press/Release RX_RESET Button SW3 \n\r Click FAIL if Sceen doesn't Change in 5s"
+        MK_PANEL['TstStart'] = "Press/Release RX_RESET Button SW3 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL" 
     #---------------------------------------------------------------------
@@ -1385,7 +1446,7 @@ class WorkerThread(Thread):
         else: DUT_LOG.info( "BUTTON1 Test: Pass" )
         
         MK_PANEL['TstDone'] = "Button1 Test Good!!"   
-        MK_PANEL['TstStart'] = "Press/Release M3_RESET Button SW800 \n\r Click FAIL if Sceen doesn't Change in 5s"
+        MK_PANEL['TstStart'] = "Press/Release M3_RESET Button SW600 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL"    
     
@@ -1429,7 +1490,7 @@ class WorkerThread(Thread):
             rxCgot = RX_C.read()
             if self._want_abort:            #FAIL Clicked by User
                 print "Aborting RX_RESET Hang..."
-                errStr = 'FAIL BUTTON'
+                errStr = 'FAIL BUTTON Rx_Reset'
                 return 1
             elif time.time() >= resetTimeOut:
                 errStr = "FAIL ON RX_RESET TIMEOUT"
@@ -1624,7 +1685,7 @@ class WorkerThread(Thread):
                 retry_count = 0
     
         MK_PANEL['TstDone'] = "Relays Test Good!!"    
-        MK_PANEL['TstStart'] = "Press/Release Button1 Button SW1 \n\r Click FAIL if Sceen doesn't Change in 5s"
+        MK_PANEL['TstStart'] = "Press/Release Button1 Button SW1 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL" 
     
@@ -1666,15 +1727,15 @@ class WorkerThread(Thread):
         G20_C.write("/etc/init.d/cryptfs-mount init\n")
         G20_C.flush()
         Cout = ""
-        bootTimeOut = time.time() + 100
+        bootTimeOut = time.time() + 125
         #TODO long timeout??
         while Cout.rfind("root@at91sam9g20ek:~# ") == -1:
             if Cout.rfind("RomBOOT") != -1:
-                errStr = 'FAIL ON CRYPT FS (RB)'  
+                errStr = 'FAIL ON CRYPT FS (RomBOOT fail)'  
                 DUT_LOG.error( "cryptfs-mount init:\n%s" % Cout )
                 break
             elif time.time() >= bootTimeOut:
-                errStr = 'FAIL ON CRYPT FS (RB1) TIMEOUT'
+                errStr = 'FAIL ON CRYPT FS (RomBOOT) TIMEOUT'
                 break
             
             G20_Cgot = G20_C.read() #all()
@@ -1688,7 +1749,7 @@ class WorkerThread(Thread):
                 G20_C.write("sync\n")
                 G20_C.flush()
                 Cout = ""
-                PromtTimeOut = time.time() + 100
+                PromtTimeOut = time.time() + 125
                 while Cout.rfind("root@at91sam9g20ek:~# ") == -1:
                     G20_Cgot = G20_C.read() #all()
                     #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
@@ -1748,7 +1809,7 @@ class WorkerThread(Thread):
             DUT_LOG.info( "G20-Watchdog Test: Pass" )
             
         MK_PANEL['TstDone'] = "Supervisor Test Good!!"   
-        MK_PANEL['TstStart'] = "Press/Release G20_RESET Button SW1 \n\r Click FAIL if Sceen doesn't Change in 5s"
+        MK_PANEL['TstStart'] = "Press/Release G20_RESET Button SW100 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL"
    
@@ -2275,12 +2336,9 @@ class theFrame(wx.Frame):
     def __init__(self, parent, id):
         global TEST_STEP, DEVICE_TYPE, DONE_BUTTON
         
-        dw, dh = wx.DisplaySize()
+        #dw, dh = wx.DisplaySize()
         
-        
-        y = 10 
-        x = 280
-        #wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.0' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
+        #wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.01' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
         wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.0' , pos=(0, -1250), size=(500, 200)) #size=(620, 180))
         
         # Set up event handler for any worker thread results
@@ -2392,18 +2450,7 @@ class theFrame(wx.Frame):
             G_PAN_ID.Destroy()                  #Destroy the old before creating new
         G_PAN_ID = wx.Panel(self, size=self.GetClientSize())
         wx.EVT_CLOSE(self, self.OnQuit)         #Might Want to Abort Worker Thread When Quitting...
-        #Set Pictures
-        '''
-        self.pic1 = wx.StaticBitmap(G_PAN_ID)
-        self.pic2 = wx.StaticBitmap(G_PAN_ID)
-        self.pic1.SetBitmap(wx.Bitmap("PICS/sfLogo.gif"))
-        self.pic2.SetBitmap(wx.Bitmap("PICS/sfLogo.gif"))
-        '''
-        
-
-        
-
-        
+       
         #Set Text Controls
         self.sTxt1 = wx.StaticText(G_PAN_ID, T_TXT_ID, staticTxt1, style=wx.ALIGN_CENTRE)
         self.sTxt1.SetFont(wx.Font(14, wx.SWISS, wx.NORMAL, wx.BOLD))
@@ -2423,7 +2470,7 @@ class theFrame(wx.Frame):
         elif staticTxt1.find('FAIL') != -1:
             self.sTxt1.SetForegroundColour(wx.RED)   #Set Text 1 Color RED For Failures
         elif staticTxt1.find('PASSED') != -1:
-            self.sTxt1.SetForegroundColour('#33CC33') #Set Text 1 Color GREEN For good DUTs
+            self.sTxt1.SetForegroundColour('#44a344' )  #33CC33') #Set Text 1 Color GREEN For good DUTs
         
         
         if staticTxt2.find('Button1') != -1 or staticTxt1.find('BUTTON1') != -1:
@@ -2875,6 +2922,7 @@ class theFrame(wx.Frame):
         if(WRITE_KP == False):
             print "NOT",
         print "write to rsa_key.pem..."
+        
     #----------------------------------------Handler for Restart Button
     def OnRestartBtn(self, evt):
         global TEST_STEP, G20_C, G20_TTY, RX_C, RX_TTY,MUX_C, MUX_TTY,METER_C, METER_TTY, SECOND_PASS_PLUS
@@ -2904,6 +2952,8 @@ class theFrame(wx.Frame):
                 self.makePanel("PROGRAM ERROR", errSt, "RESTART", "NADA")
             else:
                 self.makePanel("PROGRAM ERROR", "Unkwon Error!", "RESTART", "NADA")
+            
+            DUT_LOG.error( errStr )
                 
         
         
@@ -2914,9 +2964,9 @@ class theFrame(wx.Frame):
         global TestNames, MK_PANEL, CUST_TEST, DEVICE_TYPE, S2_PWR_OFF
         
         print "You Clicked the Right (FAIL) Button"
-#        if self.worker:
-#            print "Aborting Worker @ Step %d" % TEST_STEP
-#            self.worker.abort()     #Flag the worker thread to stop if running
+        if self.worker:
+            print "Aborting Worker @ Step %d" % TEST_STEP
+            self.worker.abort()     #Flag the worker thread to stop if running
             
         if TestNames[TEST_STEP - 1] == 'VisualLED':
             errStr = "FAIL ON LEDs"
@@ -2931,6 +2981,8 @@ class theFrame(wx.Frame):
         else:
             print "Test name: " + TestNames[TEST_STEP - 1]
             errStr = "FAIL for Test " + TestNames[TEST_STEP - 1]
+            
+        DUT_LOG.error( errStr )
             
         TEST_STEP = 0
         
