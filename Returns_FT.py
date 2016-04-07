@@ -51,7 +51,7 @@ else:   # Engineering
     M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.02'                        # returns.py Version number. 
+VER = '1.03'                        # returns.py Version number. 
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
@@ -893,7 +893,7 @@ class WorkerThread(Thread):
                 
         #"USB Ports Good!! Please Wait...", "Programming RX...", "NADA", "NADA"
         MK_PANEL['TstDone'] = "USB Ports Good!! Please Wait..."   
-        MK_PANEL['TstStart'] = "Programming Coproccessor..."
+        MK_PANEL['TstStart'] = "Programming Coprocessor..."
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "NADA"
     
@@ -933,7 +933,6 @@ class WorkerThread(Thread):
                 if G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app/utils#") == -1:
                     errStr = 'FAIL ON SD FS moving to utils (REPLACE CARD?)'
             
-                output = ""
                 DUT_LOG.info( "Erasing M3..." )
                 #print "Doing Erase..."
                 timeOut = time.time() + 20
@@ -945,13 +944,15 @@ class WorkerThread(Thread):
                         break
                 else:
                     errStr = 'FAIL ON M3 ERASE TIMEOUT'
-                    DUT_LOG.error( "Erase M3 Timeout:\n%s" % output )
+                    DUT_LOG.error( "Erase M3 Timeout:\n%s" % G20_Cgot )
                     return 1
                     
                 DUT_LOG.info( "Erase M3 took %d seconds" % (time.time() - (timeOut - 20)) )
 
                 DUT_LOG.info( "Programming M3..." )
                 #print "Doing Program..."
+                LIL_C.flushInput()
+                G20_C.flushInput()
                 timeOut = time.time() + 60
                 G20_Cgot = self.SerialPortWrite(G20_C,"python m3loader.py -a 0x08000000 -f /var/smallfoot/littletoe/" + binName + "\n", 1)
                 while time.time() < timeOut:
@@ -961,15 +962,16 @@ class WorkerThread(Thread):
                         break
                 else:
                     errStr =  'FAIL ON PROGRAM M3 TIMEOUT'
-                    DUT_LOG.error( "Prog M3 Timeout:\n%s" % output )
+                    DUT_LOG.error( "Prog M3 Timeout:\n%s" % G20_Cgot )
                     return 1
                 #print "[%d]:%s" % (len(output), output)
-                if output.rfind("Errno") != -1 or output.rfind("Traceback") != -1:
+                if G20_Cgot.rfind("Errno") != -1 or G20_Cgot.rfind("Traceback") != -1:
                     errStr = 'FAIL ON PROGRAM M3 ERROR'
-                    DUT_LOG.error( "Prog M3 FAIL:\n%s" % output )
+                    DUT_LOG.error( "Prog M3 FAIL:\n%s" % G20_Cgot )
                     return 1
                 DUT_LOG.info( "M3 Programming took %d seconds" % (time.time() - (timeOut - 60)) )
-                lilCgot = LIL_C.read(650)   #Read enough to get version and ID
+                
+                lilCgot = LIL_C.readall()   #Read enough to get version and ID
                 #print "[%d]:%s" % (len(lilCgot), lilCgot)
                 m3IdIndex = lilCgot.rfind( "Image 1 is a good image" )
                 if ( m3IdIndex ) == -1:
@@ -980,6 +982,7 @@ class WorkerThread(Thread):
                     #m3IdStr = lilCgot[ (m3IdIndex+6) : (m3IdIndex+6+8) ]    #+6 for "ID: 0x" +8 for HHHHHHHH
                     DUT_LOG.info( "Got M3 Image 1 Good Message!")
                     
+                #lilCgot = LIL_C.read(650)   #Read enough to get version and ID
                 if lilCgot.find( S2_M3_VERS) == -1:
                     errStr = 'FAIL ON M3 VERSION'
                     DUT_LOG.error( "FAIL Bad M3 Version: %s" % lilCgot )
@@ -1687,7 +1690,7 @@ class WorkerThread(Thread):
     #
     def S2_Relay(self):
         global errStr, DUT_LOG, G20_C
-        print "Testing S2 Realys..."
+        print "Testing S2 Relays..."
         retry_count = 4
         while(retry_count > 0 ):
             G20_C.flushInput()
@@ -2138,15 +2141,17 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def PrintZebraLabels(self):
-        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV, errStr
+        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV, errStr, MFG
         if ZEBRA_LC:
             print "ZEBRA GO!!"
             macNoSepSTR = ""
             for i in range(0,17):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
-            #labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
-            labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            if MFG:
+                labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            else:
+                labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             printStr = ""
             
             if ZEBRA_DV == None:
@@ -2521,11 +2526,11 @@ class theFrame(wx.Frame):
         #Add Program RX & Write Key Checkboxes if Screen1
         if TEST_STEP == 1:
 #            
-            Prt_Btn = wx.Button(G_PAN_ID, BTN_PRT_ID, 'Print Label', (400, 118), (65, -1))
+            Prt_Btn = wx.Button(G_PAN_ID, BTN_PRT_ID, 'Print Label', (380, 118), (65, -1))
   
             self.Bind(wx.EVT_BUTTON, self.OnPrintAnyMac, Prt_Btn)
             
-            self.MacInput = wx.TextCtrl(G_PAN_ID, TXT_BX_ID, "Enter_MAC_Here", (385, 90), size=(95, -1))
+            self.MacInput = wx.TextCtrl(G_PAN_ID, TXT_BX_ID, "MAC_ID_NO_DASHES", (365, 90), size=(114, -1))
           
             progRX = wx.CheckBox(G_PAN_ID, RX_CB_ID, label="Program Coprocessor?")
             progRX.SetValue(FLASH_COPRO)
@@ -2710,7 +2715,7 @@ class theFrame(wx.Frame):
             Tmp1 = Tmp.upper()
             Tmp1 = "-".join(Tmp1[i:i+2] for i in range(0, len(Tmp), 2))
             print "Printing one Barcode Label..."
-            DUT_MAC = Tmp1
+            DUT_MAC = str(Tmp1)
             
             
             labelCnt = ZEBRA_LC
@@ -3170,17 +3175,20 @@ class theFrame(wx.Frame):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def Frame_PrintZebraLabels(self):
-        global  DUT_MAC, ZEBRA_DV, ZEBRA_LC
+        global  DUT_MAC, ZEBRA_DV, ZEBRA_LC, MFG
         
         
         if ZEBRA_LC:
-            print "ZEBRA GO!!"
+            print "ZEBRA GO!! " + DUT_MAC
             macNoSepSTR = ""
             for i in range(0,17):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
-            #labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
-            labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            if MFG:
+                labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            else:
+                labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+            
             printStr = ""
             
             if ZEBRA_DV == None:
