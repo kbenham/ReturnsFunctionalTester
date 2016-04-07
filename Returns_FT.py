@@ -20,6 +20,7 @@ import keygen                       #For Key Write
 import decimal as DEC
 from subprocess import Popen
 import win32print
+import string
 
 
 
@@ -34,10 +35,11 @@ if MFG:
     ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
 
     # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-    S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
-    S2_C_COMMS  = ['COM92',  None,   'COM91', 'COM6', 'COM76' ]
-    M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
-    M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
+    S2_COMMS    = ['COM29',  None,   'COM28',  None,   None]
+    S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
+    M2_COMMS    = ['COM86', 'COM77',  None,   'COM16', 'COM76' ]     
+    M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM76' ]
+
     
 else:   # Engineering 
     DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
@@ -60,7 +62,7 @@ SECOND_PASS_PLUS = False            # after the first pass don't reload the test
 ZEBRA_DV    = None                  # Zebra Device (opened)
 
 S2_PWR_ON   = "open 1"              # Turn on power to the S2.
-S2_PWR_OFF  = "close 255"           # Turn off power to the S2.
+S2_PWR_OFF  = "close 255"           # Turn off all relay.
 S2_USB_ON   = "open 2"              # Turn on S2 USB power.
 S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
 
@@ -118,7 +120,8 @@ DT_S2_C_ID  = wx.NewId()            # Device Type S2_C CheckBox ID.
 DT_M2_ID    = wx.NewId()            # Device Type M2 CheckBox ID.
 DT_M2_B_ID  = wx.NewId()            # Device Type M2_B CheckBox ID.
 LB_CNT_ID   = wx.NewId()            # Barcode Labels wanted listbox.
-UP_CB_ID    = wx.NewId()            # Load Update CheckBox ID.
+BTN_PRT_ID  = wx.NewId()            # Print a Barcode label from scanded of entered MAC.
+TXT_BX_ID   = wx.NewId()            # MAC Text input box.
 
 USB_PWR_ON  = '30'                  # power on the USB Devices Thumb drive, & RS-485... Leaving power on.
            
@@ -2466,7 +2469,7 @@ class theFrame(wx.Frame):
         global FLASH_COPRO, WRITE_KP, TEST_STEP, CURRENT_LOG, CAN_SKIP, DUT_MAC, TestNames
         global CustomTests, FIRST_TEST_PASS, SECOND_PASS_PLUS, SelectedTests
         global DT_S2_ID, DT_S2_C_ID, DT_M2_ID, DT_M2_B_ID, LB_CNT_ID, P_TXT_ID, DEVICE_TYPE
-        global ZEBRA_LC
+        global ZEBRA_LC, BTN_PRT_ID
     
         font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
         font.SetPointSize(9)
@@ -2518,7 +2521,12 @@ class theFrame(wx.Frame):
         #Add Program RX & Write Key Checkboxes if Screen1
         if TEST_STEP == 1:
 #            
+            Prt_Btn = wx.Button(G_PAN_ID, BTN_PRT_ID, 'Print Label', (400, 118), (65, -1))
+  
+            self.Bind(wx.EVT_BUTTON, self.OnPrintAnyMac, Prt_Btn)
             
+            self.MacInput = wx.TextCtrl(G_PAN_ID, TXT_BX_ID, "Enter_MAC_Here", (385, 90), size=(95, -1))
+          
             progRX = wx.CheckBox(G_PAN_ID, RX_CB_ID, label="Program Coprocessor?")
             progRX.SetValue(FLASH_COPRO)
             #Bind Program Check
@@ -2689,7 +2697,34 @@ class theFrame(wx.Frame):
                 CustTests.SetValue(False)
                 self.ChBxLb.Hide()
     
-    
+    def OnPrintAnyMac(self, evt):
+        global ZEBRA_LC, DUT_MAC, TXT_BX_ID
+        
+        
+        Copy_MAC = DUT_MAC
+        Tmp = self.MacInput.GetValue()
+        
+        
+        # Hex Numbers only.
+        if all(c in string.hexdigits for c in Tmp) and len(Tmp) == 12:
+            Tmp1 = Tmp.upper()
+            Tmp1 = "-".join(Tmp1[i:i+2] for i in range(0, len(Tmp), 2))
+            print "Printing one Barcode Label..."
+            DUT_MAC = Tmp1
+            
+            
+            labelCnt = ZEBRA_LC
+            ZEBRA_LC = 1
+            
+            self.Frame_PrintZebraLabels()
+            
+            DUT_MAC = Copy_MAC
+            ZEBRA_LC = labelCnt
+        else:
+            print "Hex Numbers Only!!"
+            self.MacInput.SetValue('')
+            self.MacInput.SetFocus()
+        
        
     def OnLabelCountChange(self, evt):
         global ZEBRA_LC
