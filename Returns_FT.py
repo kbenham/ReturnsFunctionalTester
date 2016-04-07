@@ -51,7 +51,7 @@ else:   # Engineering
     M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.03'                        # returns.py Version number. 
+VER = '1.04'                        # returns.py Version number. 
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
