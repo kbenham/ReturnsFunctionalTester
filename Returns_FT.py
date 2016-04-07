@@ -26,8 +26,30 @@ import win32print
 #----------------------------------------------------------------------
 # Tester Globals (UPDATE THIS STUFF TO RUN THE TEST (or use arguments))
 #----------------------------------------------------------------------
-#DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
-DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
+MFG = True                         # Production using it?
+
+# Where is it running?
+if MFG:
+    DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
+    ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
+
+    # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
+    S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
+    S2_C_COMMS  = ['COM92',  None,   'COM91', 'COM6', 'COM76' ]
+    M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
+    M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
+    
+else:   # Engineering 
+    DIR = 'C:\WorkSpace\M341P_FunctionalTest\M341P_FT\CommandApp_USBRelay.exe ' 
+    ZEBRA_LC    = 0     # Zebra MAC Label Count (how many labels print)
+    
+    # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
+    S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
+    S2_C_COMMS  = ['COM92',  None,   'COM91', 'COM6', 'COM76' ]
+    M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
+    M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
+
+VER = '1.02'                        # returns.py Version number. 
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
@@ -35,7 +57,6 @@ FREQ = 2500
 SOUNDTIME = 1000
 FIRST_TEST_PASS = True              # When the test is started/restarted we need to wait for the Start button to be pressed.
 SECOND_PASS_PLUS = False            # after the first pass don't reload the test list.
-ZEBRA_LC    = 5                     # Zebra MAC Label Count (how many labels print)
 ZEBRA_DV    = None                  # Zebra Device (opened)
 
 S2_PWR_ON   = "open 1"              # Turn on power to the S2.
@@ -43,11 +64,7 @@ S2_PWR_OFF  = "close 255"           # Turn off power to the S2.
 S2_USB_ON   = "open 2"              # Turn on S2 USB power.
 S2_USB_OFF  = "close 2"             # Turn off S2 USB power.
 
-            # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-S2_COMMS    = ['COM87',  None,   'COM80',  None,   None]
-S2_C_COMMS  = ['COM92',  None,   'COM91', 'COM6', 'COM76' ]
-M2_COMMS    = ['COM86', 'COM77',  None,   'COM6', 'COM76' ]     
-M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
+
             
 DEVICE_TYPE = 'S2_C'                # S2, M2, S2_C, M2_B 
 
@@ -60,7 +77,7 @@ CAN_SKIP    = True                  # Set true to Enable FLASH_RX & KEY-PAIR Che
 FLASH_COPRO = True                  # Skips Coprocessor Programming if False (CAN_SKIP must be True if not using CL)
 WRITE_KP    = True                  # Skips MAC Key-Pair Association if False (CAN_SKIP must be True)
 CUST_TEST   = False                 # start with Custom Tests disabled.
-WRITE_UPGRADE = False               # Skip Write upgrade.
+
 
 PWR_BIT     = '20'                  # Power on Bit.
 PWR_ON      = True                  # Assume the State of Power is ON so it will turn OFF first pass.
@@ -669,7 +686,7 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #   Linux Login
     def LinuxLogin(self):
-        global BOOTLOG, BOOT_T, errStr, S2_USB_ON, DEVICE_TYPE, WRITE_UPGRADE
+        global BOOTLOG, BOOT_T, errStr, S2_USB_ON, DEVICE_TYPE
         
         if DEVICE_TYPE != 'S2':
             print "Waiting for RomBOOT..."
@@ -751,9 +768,6 @@ class WorkerThread(Thread):
                     
         if errStr != None:
             return 1
-#        elif WRITE_UPGRADE: # No Errors write the upgrade file to the tmp location.
-#            self.WriteUpgradeFile()
-            
         
         #"Logged In!! Please Wait...", "Verifying Bootlog and MAC...", "NADA", "NADA"
         MK_PANEL['TstDone'] = "Logged In!! Please Wait..."    
@@ -1805,15 +1819,13 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #     Supervisor
     def WatchDog(self):  
-        global errStr, DUT_LOG, G20_C, WRITE_UPGRADE                
+        global errStr, DUT_LOG, G20_C   
         print "killing the mfgpetter..."
         
         G20_Cgot = self.SerialPortWrite(G20_C, "killall mfgpetter\n")
         #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
         print "Waiting 13s for RomBOOT..."
         
-#        if WRITE_UPGRADE: # Move the upgrade file to the update direcory.
-#            G20_Cgot = self.SerialPortWrite(G20_C, 'mv /var/smallfoot/update-tmp/upgrade-\t /var/smallfoot/update/\n')
         
         bootStat = self.BigRomBoot(13)
         if bootStat != 1:
@@ -2054,7 +2066,7 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_RxPwrLED(self):
-        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX, WRITE_UPGRADE
+        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX
         timeStrt = time.time()                            # Hook to the LED Junction D20
             
         print "Testing RX Power LED Test..."
@@ -2075,14 +2087,12 @@ class WorkerThread(Thread):
         
         print "TOTAL TEST TIME: %d seconds" % (time.time() - TEST_START_TIME) 
         
-#        if WRITE_UPGRADE: # Move the upgrade file to the update direcory.
-#            G20_Cgot = self.SerialPortWrite(G20_C, 'mv /var/smallfoot/update-tmp/upgrade-\t /var/smallfoot/update/\n')  
         #'''           
 
     #---------------------------------------------------------------------
     #
     def S2_BrownOut(self):
-        global errStr, DUT_LOG, LIL_C, DEVICE_TYPE, S2_PWR_OFF, FIRST_TEST_PASS, WRITE_UPGRADE
+        global errStr, DUT_LOG, LIL_C, DEVICE_TYPE, S2_PWR_OFF, FIRST_TEST_PASS
         
 #        if FIRST_TEST_PASS:
 #            return
@@ -2100,10 +2110,7 @@ class WorkerThread(Thread):
                 return 1
    
         print "Waiting ENDLESSLY for UV Supply"
-        
-#        if WRITE_UPGRADE: # Move the upgrade file to the update direcory.
-#            G20_Cgot = self.SerialPortWrite(G20_C, 'mv /var/smallfoot/update-tmp/upgrade-\t /var/smallfoot/update/\n')  
-             
+               
         Cout = ""
         LIL_C.flushInput()
         LIL_C.flushOutput()
@@ -2123,41 +2130,7 @@ class WorkerThread(Thread):
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "FAIL"
 
-    #---------------------------------------------------------------------
-    #    Copy Upgrade File from Local Thumb Drvie to Update Directory.
-    def WriteUpgradeFile(self):
-        global DUT_LOG, DUT_MAC, errStr
-        
-        print "Copying Upgrade File to TMP Directory /var/smallfoot/update-tmp/."     
-
-        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo mkdir /usb1\n')
-          
-        if G20_Cgot.rfind("error") != -1:
-            errStr = 'FAIL Write Upgrade Creating /usb1 directory!'  
-            return 1
-        # mount the thumb drive.
-        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo mount -t vfat /dev/sda1 /usb1\n')
-        
-        if G20_Cgot.rfind("does not exist") != -1 or G20_Cgot.rfind("error") != -1:
-            errStr = 'FAIL Write Upgrade mounting Thumb Drive at /usb1 directory!'  
-            return 1
-        
-        # Copy the upgrade file to the SD-Card tmp location for now will move to update at the end of test.
-        G20_Cgot = self.SerialPortWrite(G20_C, 'cp /usb1/upgrade-\t /var/smallfoot/update-tmp\n')     #update/\n')
-
-        if G20_Cgot.rfind("cannot stat") != -1 or G20_Cgot.rfind("error") != -1:
-            errStr = 'FAIL Write Upgrade copying upgrade file to update-tmp directory!'  
-            return 1
-        
-        # unmount the USB drive.
-        G20_Cgot = self.SerialPortWrite(G20_C, 'umount /usb1\n')
-        
-        if G20_Cgot.rfind("error") != -1:
-            errStr = 'FAIL Write Upgrade unmounting Thumbdrive from /usb1 directory!'  
-            return 1
-        # Remove the mount directory
-        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo rmdir /usb1\n')
-        
+      
         
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
@@ -2194,9 +2167,7 @@ class WorkerThread(Thread):
             DUT_LOG.warning( "USER SELECTED NO LABELS" )
 
     
-    #---------------------------------------------------------------------
-    #
-
+  
 
 
     #------------------------- Mux address routine
@@ -2391,12 +2362,12 @@ class WorkerThread(Thread):
 #----------------------------------------------------------------------
 class theFrame(wx.Frame):
     def __init__(self, parent, id):
-        global TEST_STEP, DEVICE_TYPE, DONE_BUTTON
+        global TEST_STEP, DEVICE_TYPE, DONE_BUTTON, VER, MFG
         
-        #dw, dh = wx.DisplaySize()
-        
-        #wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.02' , pos=(0, 0), size=(500, 200)) #size=(620, 180))
-        wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version 1.02' , pos=(-1250, 0), size=(500, 200)) #size=(620, 180))
+        if MFG:
+            wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' Production', pos=(-1250, 0), size=(500, 200)) #size=(620, 180))
+        else:
+            wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' ENG', pos=(0, 0), size=(500, 200)) #size=(620, 180))
         
         # Set up event handler for any worker thread results
 #        EVT_RESULT(self,self.OnResult)
@@ -2495,7 +2466,7 @@ class theFrame(wx.Frame):
         global FLASH_COPRO, WRITE_KP, TEST_STEP, CURRENT_LOG, CAN_SKIP, DUT_MAC, TestNames
         global CustomTests, FIRST_TEST_PASS, SECOND_PASS_PLUS, SelectedTests
         global DT_S2_ID, DT_S2_C_ID, DT_M2_ID, DT_M2_B_ID, LB_CNT_ID, P_TXT_ID, DEVICE_TYPE
-        global ZEBRA_LC, WRITE_UPGRADE
+        global ZEBRA_LC
     
         font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
         font.SetPointSize(9)
@@ -2546,11 +2517,6 @@ class theFrame(wx.Frame):
             
         #Add Program RX & Write Key Checkboxes if Screen1
         if TEST_STEP == 1:
-#            # add Load Update File checkbox and event.
-#            updateFile = wx.CheckBox(G_PAN_ID, UP_CB_ID, label= "Write Upgrade File?")
-#            updateFile.SetValue(WRITE_UPGRADE)
-#            #Bind Upgrade Check
-#            self.Bind(wx.EVT_CHECKBOX, self.OnUpgradeChck, updateFile)
 #            
             
             progRX = wx.CheckBox(G_PAN_ID, RX_CB_ID, label="Program Coprocessor?")
@@ -2724,14 +2690,6 @@ class theFrame(wx.Frame):
                 self.ChBxLb.Hide()
     
     
-#    def OnUpgradeChck(self, evt):
-#        global WRITE_UPGRADE
-#        
-#        WRITE_UPGRADE = evt.Checked()
-#        print "You Clicked the Write Upgrade File Checkbox... \nFT will",
-#        if(WRITE_UPGRADE == False):
-#            print "NOT",
-#        print "Write the Upgrade File..."
        
     def OnLabelCountChange(self, evt):
         global ZEBRA_LC
