@@ -27,18 +27,30 @@ import string
 #----------------------------------------------------------------------
 # Tester Globals (UPDATE THIS STUFF TO RUN THE TEST (or use arguments))
 #----------------------------------------------------------------------
-MFG = False                         # Production using it?
+MFG     = True                      # Production using it?
+DESKTOP = True                      # Shawn's computer... other wise it is the Laptop.
 
 # Where is it running?
 if MFG:
-    DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
-    ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
-
-    # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-    S2_COMMS    = ['COM29',  None,   'COM28',  None,   'COM76']
-    S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
-    M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM76' ]     
-    M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM76' ]
+    if DESKTOP:
+        DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
+        ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
+    
+        # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
+        S2_COMMS    = ['COM29',  None,   'COM28',  None,   'COM76']
+        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
+        M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM76' ]     
+        M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM76' ]
+        
+    else:   # Laptop
+        DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
+        ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
+    
+        # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
+        S2_COMMS    = ['COM29',  None,   'COM28',  None,   'COM76']
+        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
+        M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM76' ]     
+        M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM76' ]
 
     
 else:   # Engineering 
@@ -51,7 +63,12 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.05'                        # returns.py Version number. 
+VER = '1.06'                        # returns.py Version number. 
+CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
+SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
+KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
+RESTORE_KEY     = False             # Restore old rsa_key.pem to new SD-CARD.
+
 M2commish = "M2_Commish.py"         # setup to load the Button1 test on the SD-CARD.
 M2_485 = "M2_485.py"                #setup to load the Button1 test on the SD-CARD.
 TEST_COUNT = 1                      # Count of total test loops without a restart.
@@ -124,6 +141,7 @@ DT_M2_B_ID  = wx.NewId()            # Device Type M2_B CheckBox ID.
 LB_CNT_ID   = wx.NewId()            # Barcode Labels wanted listbox.
 BTN_PRT_ID  = wx.NewId()            # Print a Barcode label from scanded of entered MAC.
 TXT_BX_ID   = wx.NewId()            # MAC Text input box.
+KEY_RS_ID   = wx.NewId()            # Copy and restore old rsa_key.pem to new SD-CARD.
 
 USB_PWR_ON  = '30'                  # power on the USB Devices Thumb drive, & RS-485... Leaving power on.
            
@@ -636,7 +654,7 @@ class WorkerThread(Thread):
         while FIRST_TEST_PASS:                      # wait for the start button to be pressed.
                 time.sleep(1)
                 
-        print "Waiting ENDLESSLY for RomBOOT..."
+        print "Waiting 10 Seconds for RomBOOT..."
         print 'Test step = ' + str(TEST_STEP)
         
         print 'Turning on S2 power'
@@ -645,7 +663,7 @@ class WorkerThread(Thread):
             return 1
             
         time.sleep(2)
-        bootStat = self.BigRomBoot(0)
+        bootStat = self.BigRomBoot(10)
         if bootStat != 1:
             if bootStat != -2:              #USER ABORT IS -2
                 wx.PostEvent(self._notify_window, ResultEvent('FAIL ON RomBOOT'))
@@ -757,11 +775,12 @@ class WorkerThread(Thread):
                     G20_Cgot = self.SerialPortWrite(G20_C, "cd /var/smallfoot/smallfoot-app\n")
                     #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
                     #82 "cd /var/small...+root@at91sa...mallfoot-app#"
+                    
+                    print 'Turning on ' + DEVICE_TYPE + ' USB power'
                     if G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app#") == -1:
                         #TODO SAVE BIGTOE BOOTLOG?
                         errStr = 'FAIL ON SD FS 1 (REPLACE CARD?)'
                     elif DEVICE_TYPE != 'S2' and DEVICE_TYPE != 'M2':
-                        print 'Turning on ' + DEVICE_TYPE + ' USB power'
                         if self.switchMux(USB_PWR_ON) != 1:
                             errStr = 'FAIL MUX SWITCH POWER ON'
                     elif DEVICE_TYPE == 'S2':
@@ -769,14 +788,11 @@ class WorkerThread(Thread):
                             errStr = 'FAIL MUX SWITCH S2 USB POWER ON'
                             
                     elif DEVICE_TYPE == 'M2':   # S2 & M2 Only!
-                        print 'Turning on USB power'
                         Rtrn = self.M2_Power(M2_USB_ON)
                         if Rtrn:
                             errStr = "Fail USB Power Failed! \n Try Unplugging & Replugging USB."
                             return 1
-                              
-                            
-                    
+                                
                     time.sleep(3)   # Wait for the USB connect messages to happen.
                     # Add USB power on to Boot log
                     BOOTLOG += G20_C.readall()
@@ -794,8 +810,10 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #       Get MAC ID 
     def MacId(self):
-        global CURRENT_LOG, BOOTLOG, BOOT_T, DUT_MAC
-        global DUT_LOG, TEMP_LOG, errStr, G20_C, DEVICE_TYPE
+        global CURRENT_LOG, BOOTLOG, BOOT_T, DUT_MAC, SD_CARD_VERSION, KEY_RESTORED
+        global DUT_LOG, TEMP_LOG, errStr, G20_C, DEVICE_TYPE, CURRENT_SD_VER
+        
+        KEY_RESTORED = False
         
         #TEST_STEP = 3 => MAC & Bootlog Verification
         #MAC Test
@@ -843,6 +861,30 @@ class WorkerThread(Thread):
         if DEVICE_TYPE == 'S2' or DEVICE_TYPE == 'S2_C':
             self.EtherNet()
         
+        
+             
+        G20_Cgot = self.SerialPortWrite(G20_C, "cat /var/smallfoot/SYSVER\n")
+        start = G20_Cgot.index("VER")
+        SD_CARD_VERSION = G20_Cgot[start+5:start+10]
+        print 'SD-CARD Version: '+ SD_CARD_VERSION
+        
+        #---------------If Old SD_CARD Version Copy the rsa_key.pem ---------------
+        if RESTORE_KEY:
+            # if this is the old SD_CARD save the PEM file to the thumb drive.
+            if SD_CARD_VERSION != CURRENT_SD_VER:
+                self.CopyPemFile()
+                print DUT_MAC + '.pem Saved to Thumb Drive! \n'
+            elif SD_CARD_VERSION == CURRENT_SD_VER:     # restore the PEM file if it is there
+                self.RestorePemFile()
+                if errStr == None:
+                    print 'rsa_key.pem Restored! \n'
+                    KEY_RESTORED = True            # Don't write a new rsa key.
+                elif errStr.rfind('File Not Found') != -1:
+                    print 'No rsa_key.pem to Restore!\n'
+                    errStr = None
+                else:
+                    return 1
+ 
         #------------- Check USBs registered -------------
         # NOT NEED CHECKED IN USB BOUNCE KGB
 #        if BOOTLOG.rfind("usb 1-1: new full speed USB device") == -1:
@@ -870,7 +912,85 @@ class WorkerThread(Thread):
         MK_PANEL['Button1'] = "NADA"
         MK_PANEL['Button2'] = "NADA"
             
+    #---------------------------------------------------------------------
+    #  Mount Thumb Drive
+    def MountThumbDrive(self):
+        print "MountThumbDrive Mounting Thumb Drive to /usb1\n" 
+        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo mkdir /usb1\n')
+          
+        if G20_Cgot.rfind("error") != -1:
+            errStr = 'FAIL MountThumbDrive Creating /usb1 directory!\n'  + G20_Cgot 
+            return 1
+        # mount the thumb drive.
+        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo mount -t vfat /dev/sda1 /usb1\n')
+        
+        if G20_Cgot.rfind("does not exist") != -1 or G20_Cgot.rfind("error") != -1:
+            errStr = 'FAIL MountThumbDrive mounting Thumb Drive at /usb1 directory!\n'  + G20_Cgot
+            return 1
+        
+        return 0
     
+    #---------------------------------------------------------------------
+    #  UnMount Thumb Drive
+    def UmountThumbDrive(self):
+        print "UmountThumbDrive Unmounting Thumb Drive from /usb1\n" 
+        # unmount the USB drive.
+        G20_Cgot = self.SerialPortWrite(G20_C, 'umount /usb1\n')
+        
+        if G20_Cgot.rfind("error") != -1:
+            errStr = 'FAIL UmountThumbDrive Unmounting Thumbdrive from /usb1 directory!\n'  + G20_Cgot  
+            return 1
+        # Remove the mount directory
+        G20_Cgot = self.SerialPortWrite(G20_C, 'sudo rmdir /usb1\n')
+        
+        return 0
+        
+            
+    #---------------------------------------------------------------------
+    #  Copy Old PEM File from Local Thumb Drive to smallfoot-app Directory.
+    def RestorePemFile(self):
+        global DUT_LOG, DUT_MAC, errStr
+        
+        self.MountThumbDrive()
+        
+        if errStr == None:
+            # Check that the file is there.
+            G20_Cgot = self.SerialPortWrite(G20_C, 'ls /usb1/' + DUT_MAC + '.pem\n')
+            #print 'G20_Cgot = ' + G20_Cgot
+            if G20_Cgot.rfind('No such file') != -1:
+                errStr = DUT_MAC + ".pem File Not Found!" 
+                
+            if errStr == None:
+                print "RestorePemFile Moving original PEM file to smallfoot-app\n"
+                # Move the PEM file to the SD-Card location... Overwrite default PEM.
+                G20_Cgot = self.SerialPortWrite(G20_C, 'mv -f /usb1/' + DUT_MAC + '.pem /var/smallfoot/smallfoot-app/rsa_key.pem\n')
+        
+                if G20_Cgot.rfind("cannot stat") != -1 or G20_Cgot.rfind("error") != -1:
+                    errStr = 'FAIL RestorePemFile to smallfoot-app directory!\n'  + G20_Cgot  
+                
+            self.UmountThumbDrive()
+        
+        
+        
+    #---------------------------------------------------------------------
+    #    Copy PEM File from SD-Card to the Thumb Drive.
+    def CopyPemFile(self):
+        global DUT_LOG, DUT_MAC, errStr
+        
+        self.MountThumbDrive()
+        
+        if errStr == None:
+            print 'CopyPemFile copying rsa_key.pem to the Thumb Drive /usb1/' + DUT_MAC + '.pem\n'
+            # Copy the PEM file from the SD-Card to the Thumb Drive.
+            G20_Cgot = self.SerialPortWrite(G20_C, 'cp /var/smallfoot/smallfoot-app/rsa_key.pem /usb1/' + DUT_MAC + '.pem\n')     
+    
+            if G20_Cgot.rfind("cannot stat") != -1 or G20_Cgot.rfind("error") != -1:
+                errStr = 'FAIL CopyPemFile copying PEM file to /usb1 directory!\n'  + G20_Cgot 
+                
+            self.UmountThumbDrive()
+            
+            
+        
     #---------------------------------------------------------------------
     #     Ethernet Test
     def EtherNet(self):
@@ -1442,7 +1562,7 @@ class WorkerThread(Thread):
         print "Testing Button1..."
         
         #print "SKipping M2_B_Button1!!! KGB"
-        #return
+        #'''
         G20_Cgot = self.SerialPortWrite(G20_C, "ls /var/smallfoot/smallfoot-app/test/FuncTest/BTL/M2_Commish.py\n", 1)
         # do we need to write the file?
         if G20_Cgot.find("No such file or directory") != -1:
@@ -1483,7 +1603,7 @@ class WorkerThread(Thread):
                 errStr = "FAIL BUTTON1 User Abort!!"
                 return 1
         else: DUT_LOG.info( "BUTTON1 Test: Pass" )
-          
+        #''' 
         
         MK_PANEL['TstDone'] = "Button1 Test Good!!"   
         MK_PANEL['TstStart'] = "Press/Release RX_RESET Button SW3 \n\r Click FAIL if Screen doesn't Change in 5s"
@@ -1495,8 +1615,8 @@ class WorkerThread(Thread):
         global errStr, DUT_LOG, G20_C
         
         #print "SKipping S2_Button1!!! KGB"
-        #return
-        #print "Waiting for Config Button Asynch on RPC..."
+        print "Waiting for Config Button Asynch on RPC..."
+        #'''
         print "Waiting for BUTTON1 Press..."
         G20_C.flushInput()
         G20_C.write("python test/FuncTest/BTL/btlCommish-FT.py&\n")
@@ -1509,7 +1629,7 @@ class WorkerThread(Thread):
                 print "Aborting BUTTON1 Hang..."
                 return 1
         else: DUT_LOG.info( "BUTTON1 Test: Pass" )
-        
+        #'''
         MK_PANEL['TstDone'] = "Button1 Test Good!!"   
         MK_PANEL['TstStart'] = "Press/Release M3_RESET Button SW600 \n\r Click FAIL if Screen doesn't Change in 5s"
         MK_PANEL['Button1'] = "NADA"
@@ -1521,8 +1641,8 @@ class WorkerThread(Thread):
         global errStr, DUT_LOG, LIL_C
         
         #print "SKipping S2_M3_Reset!!! KGB"
-        #return
-        #print "Waiting for a byte from M3..."
+        print "Waiting for a byte from M3..."
+        #'''
         print "Waiting for M3_RESET Press..."
         LIL_C.flushInput()
         lilCgot = ""
@@ -1532,7 +1652,7 @@ class WorkerThread(Thread):
                 print "Aborting M3_RESET Hang..."
                 return 1
         else: DUT_LOG.info( "M3_RESET Button Test: Pass" )
-            
+        #'''    
         MK_PANEL['TstDone'] = "M3_RESET Button Test Good!!"   
         MK_PANEL['TstStart'] = "Encrypting SD Card..."
         MK_PANEL['Button1'] = "NADA"
@@ -1759,11 +1879,11 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #    Encryption & Public Key
     def EncryptKey(self):
-        global errStr, DUT_LOG, G20_C
+        global errStr, DUT_LOG, G20_C, KEY_RESTORED, WRITE_KP
         print "Moving back home..."
 
         G20_Cgot = self.SerialPortWrite(G20_C, "cd /home/root\n")
-        if WRITE_KP:
+        if WRITE_KP and not KEY_RESTORED:
             print "Writting Key..."
             id_= None
             key = None
@@ -1781,6 +1901,9 @@ class WorkerThread(Thread):
                     G20_C.flush()
                     keygen.record_key_used(id_, DUT_MAC)
                     print "Key&MAC Associated!!"
+        elif KEY_RESTORED:
+            print 'Original rsa_key.pem Restored ... Skipping Key&MAC Association !!'
+            DUT_LOG.warning( "Skipping Key&MAC Association Step Original rsa_key.pem Restored!!" )
                     
         else:
             DUT_LOG.warning( "DANGER DANGER Skipping Key&MAC Association Step!!" )
@@ -1890,8 +2013,7 @@ class WorkerThread(Thread):
         print "Press/Release G20_RESET Button SW1"
         
         #print "KGB --> Skipping G20_Reset test <--KGB"
-        #return
-        
+        #'''
         bootStat = self.BigRomBoot(0)
         if bootStat != 1:
             if bootStat != -2:              #USER ABORT IS -2
@@ -2177,8 +2299,9 @@ class WorkerThread(Thread):
             errStr = 'FAIL MUX SWITCH POWER OFF in UV Supply Test'
             return 1
         
-        print "Waiting ENDLESSLY for UV Supply"
-               
+        print "Waiting 30 Seconds for UV Supply"
+        
+        timeOut = time.time() + 30
         Cout = ""
         LIL_C.flushInput()
         LIL_C.flushOutput()
@@ -2186,7 +2309,7 @@ class WorkerThread(Thread):
         while Cout.find("UV Supply") == -1: #Wait for userFAIL for M3_RESET Button
             lilCgot = LIL_C.read()          #TODO FASTER?? HERE DOTHIS
             Cout = Cout + lilCgot
-            if self._want_abort:            #FAIL Clicked by User
+            if self._want_abort or timeOut < time.time():            #FAIL Clicked by User or time out.
                 print "Aborting UV Supply Hang..."
                 return 1
         else:
@@ -2203,7 +2326,7 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def PrintZebraLabels(self):
-        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV, errStr, MFG
+        global DUT_LOG, DUT_MAC, ZEBRA_LC, ZEBRA_DV, errStr, MFG, DESKTOP
         if ZEBRA_LC:
             print "ZEBRA GO!!"
             macNoSepSTR = ""
@@ -2211,7 +2334,10 @@ class WorkerThread(Thread):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
-                labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                if DESKTOP:
+                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                else:   #Laptop
+                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
                 labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             printStr = ""
@@ -2432,10 +2558,13 @@ class WorkerThread(Thread):
 #----------------------------------------------------------------------
 class theFrame(wx.Frame):
     def __init__(self, parent, id):
-        global TEST_STEP, DEVICE_TYPE, DONE_BUTTON, VER, MFG
+        global TEST_STEP, DEVICE_TYPE, DONE_BUTTON, VER, MFG, DESKTOP
         
         if MFG:
-            wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' Production', pos=(-1250, 0), size=(500, 200)) #size=(620, 180))
+            if DESKTOP:
+                wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' Production', pos=(-1250, 0), size=(500, 200)) #size=(620, 180))
+            else: # Laptop
+                wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' Production', pos=(0, 0), size=(500, 200)) #size=(620, 180))
         else:
             wx.Frame.__init__(self, parent, id, ' EnerNOC Returns Tester Version ' + VER + ' ENG', pos=(0, 0), size=(500, 200)) #size=(620, 180))
         
@@ -2593,14 +2722,20 @@ class theFrame(wx.Frame):
             self.Bind(wx.EVT_BUTTON, self.OnPrintAnyMac, Prt_Btn)
             
             self.MacInput = wx.TextCtrl(G_PAN_ID, TXT_BX_ID, "MAC_ID_NO_DASHES", (365, 90), size=(114, -1))
+            
+            keyRestore = wx.CheckBox(G_PAN_ID, KEY_RS_ID, label="Restore rsa_key.pem")
+            keyRestore.SetValue(RESTORE_KEY)
+            #Bind Program Check
+            self.Bind(wx.EVT_CHECKBOX, self.OnRestoreChck, keyRestore)
+            
           
-            progRX = wx.CheckBox(G_PAN_ID, RX_CB_ID, label="Program Coprocessor?")
+            progRX = wx.CheckBox(G_PAN_ID, RX_CB_ID, label="Program Coprocessor")
             progRX.SetValue(FLASH_COPRO)
             #Bind Program Check
             self.Bind(wx.EVT_CHECKBOX, self.OnProgChck, progRX)
             
             
-            writeKP = wx.CheckBox(G_PAN_ID, KP_CB_ID, label="Write Key?")
+            writeKP = wx.CheckBox(G_PAN_ID, KP_CB_ID, label="Write Key")
             writeKP.SetValue(WRITE_KP)
             #Bind Kep-Pair Check
             self.Bind(wx.EVT_CHECKBOX, self.OnKeyPChck, writeKP)
@@ -2690,7 +2825,7 @@ class theFrame(wx.Frame):
         
         if TEST_STEP == 1:
             hSizer = wx.BoxSizer(wx.HORIZONTAL)
-#            vSizer.Add(updateFile, 0, wx.TOP | wx.ALIGN_CENTER, 5)
+            vSizer.Add(keyRestore, 0, wx.TOP | wx.ALIGN_CENTER, 5)
             vSizer.Add(progRX, 0, wx.TOP | wx.ALIGN_CENTER, 5)
             vSizer.Add(writeKP, 0, wx.TOP | wx.ALIGN_CENTER, 5)
             # add vertical space 5 pixels.
@@ -3041,6 +3176,16 @@ class theFrame(wx.Frame):
             print "aborting for Quit"
             self.worker.abort()                 #Flag the worker thread to stop if running
         self.Destroy()
+        
+    #----------------------------------Handler for Programming Checkbox
+    def OnRestoreChck(self, evt):
+        global RESTORE_KEY
+        RESTORE_KEY = evt.Checked()
+        print "You Clicked the Restore Checkbox so FT will",
+        if(RESTORE_KEY == False):
+            print "NOT",
+        print "Restore the rsa_key.pem ..."
+        
     #----------------------------------Handler for Programming Checkbox
     def OnProgChck(self, evt):
         global FLASH_COPRO
@@ -3175,6 +3320,7 @@ class theFrame(wx.Frame):
     #------------------------------------------------------------------
     def OnResult(self, event):
         global TEST_STEP, CURRENT_LOG, ZEBRA_LC, DUT_MAC, EOT_STR, G20_C, RX_C, MUX_C, METER_C, Tests, DEVICE_TYPE, errStr, M2_USB_OFF
+        global SD_CARD_VERSION
         self.worker = None
         print "Got Result: %s!!" % event.data
         TESTS = len(Tests)
@@ -3211,7 +3357,7 @@ class theFrame(wx.Frame):
             TEST_STEP += 1
             self.worker = WorkerThread(self)
             
-            self.makePanel("ALL TESTS PASSED!!!", "Powering Down DUT...\n\rUSE CAUTION when removing PCA caps still CHARGED!!!", "NADA", "NADA")
+            self.makePanel("ALL TESTS PASSED!!! SD-VER:" + SD_CARD_VERSION, "Powering Down DUT...\n\rUSE CAUTION when removing PCA caps still CHARGED!!!", "NADA", "NADA")
             # Turn off the Power.     
             MUX_C.flushInput()
             MUX_C.write("00\r")
@@ -3230,12 +3376,12 @@ class theFrame(wx.Frame):
             sX = DEVICE_TYPE
 
             if ZEBRA_LC:
-                self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printing; Please Wait...", "NADA", "NADA")
+                self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printing; Please Wait... SD-VER:" + SD_CARD_VERSION, "NADA", "NADA")
                 TEST_STEP += 1
                 self.worker = WorkerThread(self)
 
             else:
-                self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "User Selected No MAC Labels." + EOT_STR, "RESTART", "Re-Print1")
+                self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "User Selected No MAC Labels. SD-VER:" + SD_CARD_VERSION + EOT_STR, "RESTART", "Re-Print1")
             
             # Turn off the Power.     
             MUX_C.flushInput()
@@ -3267,7 +3413,7 @@ class theFrame(wx.Frame):
     #---------------------------------------------------------------------
     #    Print MAC ID Labels
     def Frame_PrintZebraLabels(self):
-        global  DUT_MAC, ZEBRA_DV, ZEBRA_LC, MFG
+        global  DUT_MAC, ZEBRA_DV, ZEBRA_LC, MFG, DESKTOP
         
         
         if ZEBRA_LC:
@@ -3277,7 +3423,10 @@ class theFrame(wx.Frame):
                 if DUT_MAC[i] != '-':
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
-                labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                if DESKTOP:
+                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                else: # Laptop
+                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
                 labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             
