@@ -37,10 +37,10 @@ if MFG:
         ZEBRA_LC    = 5     # Zebra MAC Label Count (how many labels print)
     
         # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
-        S2_COMMS    = ['COM29',  None,   'COM28',  None,   'COM76']
-        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
-        M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM76' ]     
-        M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM76' ]
+        S2_COMMS    = ['COM50',  None,   'COM51',  None,   'COM30']
+        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM30' ]
+        M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM30' ]     
+        M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM30' ]
         
     else:   # Laptop
         DIR = 'C:\Users\shawn.pate\Documents\Tester Files\BTL_FT\CommandApp_USBRelay.exe ' 
@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.06'                        # returns.py Version number. 
+VER = '1.08'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -961,9 +961,9 @@ class WorkerThread(Thread):
                 errStr = DUT_MAC + ".pem File Not Found!" 
                 
             if errStr == None:
-                print "RestorePemFile Moving original PEM file to smallfoot-app\n"
+                print "RestorePemFile Copying original PEM file to smallfoot-app\n"
                 # Move the PEM file to the SD-Card location... Overwrite default PEM.
-                G20_Cgot = self.SerialPortWrite(G20_C, 'mv -f /usb1/' + DUT_MAC + '.pem /var/smallfoot/smallfoot-app/rsa_key.pem\n')
+                G20_Cgot = self.SerialPortWrite(G20_C, 'cp -f /usb1/' + DUT_MAC + '.pem /var/smallfoot/smallfoot-app/rsa_key.pem\n')
         
                 if G20_Cgot.rfind("cannot stat") != -1 or G20_Cgot.rfind("error") != -1:
                     errStr = 'FAIL RestorePemFile to smallfoot-app directory!\n'  + G20_Cgot  
@@ -2372,11 +2372,16 @@ class WorkerThread(Thread):
 
         #Save the new Mux state.   
         MUX_VALUE = newMuxValue
+        retryCnt = 0
+        newMuxValue = ''
         try:
-            MUX_C.flushInput()
-            MUX_C.write(newMuxValue + "\r")
-            MUX_C.flush()
-            newMuxValue = MUX_C.read(3)             #get the echo 
+            while newMuxValue.rfind(MUX_VALUE) == -1 and retryCnt <= 4:
+                print "MUX retry count: " + str(retryCnt)
+                MUX_C.flushInput()
+                MUX_C.write(MUX_VALUE + "\r")
+                MUX_C.flush()
+                newMuxValue = MUX_C.read(3)             #get the echo 
+                retryCnt += 1
             
             if newMuxValue.rfind(MUX_VALUE) == -1:
                 wx.PostEvent(self._notify_window, ResultEvent('FAILED MUX SWITCH UNPLUG & REPLUG USB CABLE'))
