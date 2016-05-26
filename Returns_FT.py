@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.08'                        # returns.py Version number. 
+VER = '1.0.9'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -96,7 +96,7 @@ METER_TTY   = S2_C_COMMS[3]         # Hp Multimeter Com port.
 MUX_TTY     = S2_C_COMMS[4]         # 2 Tracker2's wire as a Mux & several relay for power & ...
 CAN_SKIP    = True                  # Set true to Enable FLASH_RX & KEY-PAIR Checkboxes
 FLASH_COPRO = True                  # Skips Coprocessor Programming if False (CAN_SKIP must be True if not using CL)
-WRITE_KP    = True                  # Skips MAC Key-Pair Association if False (CAN_SKIP must be True)
+WRITE_KP    = False                 # Skips MAC Key-Pair Association if False (CAN_SKIP must be True)
 CUST_TEST   = False                 # start with Custom Tests disabled.
 
 
@@ -270,17 +270,7 @@ for (o, a) in opts:
         ZEBRA_LC = int(a, 10)
     else:
         assert False, "unhandled option"
-if DEVICE_TYPE == 'M2' or DEVICE_TYPE == 'M2_B':
-    print "Returns Functional Test Starting with G20-TTY %s, RX-TTY %s, and \nwill" % (G20_TTY, RX_TTY),
-elif DEVICE_TYPE == 'S2' or DEVICE_TYPE == 'S2_C':
-    print "Returns Functional Test Starting with G20-TTY %s, LIL-TTY %s, and \nwill" % (G20_TTY, LIL_TTY),
-    
-if(FLASH_COPRO == False):
-    print "NOT",
-print "program the Coprocessor and \nwill",
-if(WRITE_KP == False):
-    print "NOT",
-print "Write rsa_key.pem; \n%d MAC Label(s) to be printed\n" % ZEBRA_LC
+
 #----------------------------------------------------------------------
 # Thread Event Handler Stuff
 #--------------------------------------------------Defines Result Event
@@ -865,7 +855,10 @@ class WorkerThread(Thread):
              
         G20_Cgot = self.SerialPortWrite(G20_C, "cat /var/smallfoot/SYSVER\n")
         start = G20_Cgot.index("VER")
-        SD_CARD_VERSION = G20_Cgot[start+5:start+10]
+        #SD_CARD_VERSION = G20_Cgot[start+5:start+10]
+        s = G20_Cgot[start+4:start+10]
+        SD_CARD_VERSION = s.strip(' \t\n\r')
+        
         print 'SD-CARD Version: '+ SD_CARD_VERSION
         
         #---------------If Old SD_CARD Version Copy the rsa_key.pem ---------------
@@ -1053,6 +1046,8 @@ class WorkerThread(Thread):
                     return 1
                 binName = G20_Cgot[ (m3BinIndex) : (m3BinIndex + 18) ] #btl_combo_NNNN.bin
                 S2_M3_VERS = G20_Cgot[ (m3BinIndex + 10) : (m3BinIndex + 14) ] # NNNN
+                if S2_M3_VERS == '2507':
+                    S2_M3_VERS = '2502'
                 print "SD-CARD M3 Version: " + S2_M3_VERS
             
 #                # Check the Version on the processor before we do anything.
@@ -1396,9 +1391,16 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def RS485(self):
-        global errStr, DUT_LOG, G20_C, DEVICE_TYPE
+        global errStr, DUT_LOG, G20_C, DEVICE_TYPE, SD_CARD_VERSION, CURRENT_SD_VER
         
         print "Waiting for MODBUS echo..."
+        
+        if SD_CARD_VERSION != CURRENT_SD_VER and SD_CARD_VERSION != '2.5':
+            # --- fixes pre 2.5 modbus test for old S2s
+            G20_C.write("sed -i 's/mbGot.find(\"MODBUS\\n\")/mbGot.find(\"MODBUS\")/'  test/FuncTest/BTL/btl485-FT.py\n")
+            G20_Cgot = ""
+            while G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app# ") == -1:
+                G20_Cgot += G20_C.readall()
             
         G20_Cgot = self.SerialPortWrite(G20_C, "python test/FuncTest/BTL/btl485-FT.py\n\r", 2)
         
@@ -2335,7 +2337,7 @@ class WorkerThread(Thread):
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
                 if DESKTOP:
-                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
                 else:   #Laptop
                     labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
@@ -3003,7 +3005,17 @@ class theFrame(wx.Frame):
         DEVICE_TYPE = DT
         print 'Selected Device Type: ' + DEVICE_TYPE
         
-        
+        if DEVICE_TYPE == 'M2' or DEVICE_TYPE == 'M2_B':
+            print "Returns Functional Test Starting with G20-TTY %s, RX-TTY %s, METER_TTY %s, MUX_TTY %s,and \nwill" % (G20_TTY, RX_TTY, METER_TTY, MUX_TTY),
+        elif DEVICE_TYPE == 'S2' or DEVICE_TYPE == 'S2_C':
+            print "Returns Functional Test Starting with G20-TTY %s, LIL-TTY %s, METER_TTY %s, MUX_TTY %s,and \nwill" % (G20_TTY, LIL_TTY, METER_TTY, MUX_TTY),
+            
+        if(FLASH_COPRO == False):
+            print "NOT",
+        print "program the Coprocessor and \nwill",
+        if(WRITE_KP == False):
+            print "NOT",
+        print "Write rsa_key.pem; \n%d MAC Label(s) to be printed\n" % ZEBRA_LC
         TEST_STEP = 1
         
         ERR_STR = self.InitCommPorts()
