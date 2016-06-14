@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.0.9'                        # returns.py Version number. 
+VER = '1.1.0'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -837,7 +837,7 @@ class WorkerThread(Thread):
                 #CURRENT_LOG = logging.FileHandler( "C:\WorkSpace\M341P_FunctionalTest\M341P_FT\ReturnsTestLogs/%s.log" % FILENAME )
                 CURRENT_LOG.formatter = logging.Formatter("%(asctime)s  %(message)s")
                 DUT_LOG.addHandler( CURRENT_LOG )
-                print "Got A MAC started logging to M2_TestLogs/%s.log" % DUT_MAC
+                print "Got A MAC started logging to ReturnsTestLogs/%s.log" % DUT_MAC
                 DUT_LOG.info(TEMP_LOG)                          # put the Shorts & Power tests in first
                 DUT_LOG.info( "%s TEST LOG" % DUT_MAC )
                 DUT_LOG.info( "Device Type: %s" % DEVICE_TYPE )
@@ -861,41 +861,22 @@ class WorkerThread(Thread):
         
         print 'SD-CARD Version: '+ SD_CARD_VERSION
         
-        #---------------If Old SD_CARD Version Copy the rsa_key.pem ---------------
+        #---------------If Restore selected Copy the rsa_key.pem ---------------
         if RESTORE_KEY:
             # if this is the old SD_CARD save the PEM file to the thumb drive.
-            if SD_CARD_VERSION != CURRENT_SD_VER:
+            if not WRITE_KP:     #SD_CARD_VERSION != CURRENT_SD_VER:
                 self.CopyPemFile()
                 print DUT_MAC + '.pem Saved to Thumb Drive! \n'
-            elif SD_CARD_VERSION == CURRENT_SD_VER:     # restore the PEM file if it is there
+            else:   #if SD_CARD_VERSION == CURRENT_SD_VER:     # restore the PEM file if it is there
                 self.RestorePemFile()
                 if errStr == None:
                     print 'rsa_key.pem Restored! \n'
-                    KEY_RESTORED = True            # Don't write a new rsa key.
+                    KEY_RESTORED = True                 # Don't write a new rsa key.
                 elif errStr.rfind('File Not Found') != -1:
                     print 'No rsa_key.pem to Restore!\n'
                     errStr = None
                 else:
                     return 1
- 
-        #------------- Check USBs registered -------------
-        # NOT NEED CHECKED IN USB BOUNCE KGB
-#        if BOOTLOG.rfind("usb 1-1: new full speed USB device") == -1:
-#            errStr = 'FAIL ON USB 1-1'
-#            DUT_LOG.error( "Bootlog:\n%s" %BOOTLOG )    #Save Bootlog
-#        else: 
-#            DUT_LOG.info( "USB 1-1 Test: Pass" )
-#            
-#        if errStr == None:  # No ERRORS??
-#            #USB 2 TEST
-#            if BOOTLOG.rfind("usb 1-2: new full speed USB device") == -1:
-#                errStr = 'FAIL ON USB 1-2'
-#                DUT_LOG.error( "Bootlog:\n%s" %BOOTLOG )    #Save Bootlog
-#            else: 
-#                DUT_LOG.info( "USB 1-2 Test: Pass" )
-#        else:
-#            return 1
-        
                     
         BOOTLOG = ""
         TEMP_LOG = ""
@@ -1298,7 +1279,7 @@ class WorkerThread(Thread):
                                      or Cout.rfind("SUCCESS: PC3") == -1 or Cout.rfind("SUCCESS: PC4") == -1 \
                                      or Cout.rfind("SUCCESS: PC5") == -1 or Cout.rfind("SUCCESS: PC6") == -1:
             
-            wx.PostEvent(self._notify_window, ResultEvent('FAIL ON LOW SPEED PULSE COUNT'))
+            errStr = 'FAIL ON LOW SPEED PULSE COUNT'
             DUT_LOG.error( "Bad Low Speed Pulse:\n%s" % Cout )
             return
         else: DUT_LOG.info( "Low Speed Pulse Counters Test: Pass" )
@@ -1356,7 +1337,7 @@ class WorkerThread(Thread):
                 K5_pulse2_1 = K5_pulse2_2
                 retry_count -= 1
                 if(retry_count == 0):
-                    wx.PostEvent(self._notify_window, ResultEvent('FAIL ON Hi SPEED PULSE COUNT'))
+                    errStr = 'FAIL ON Hi SPEED PULSE COUNT'
                     DUT_LOG.error( "Errors in Hi Speed Pulse Test:\n Pulse1: %s \n Pulse2: " % Cout + str(Cout1) )
                     return
                 else:
@@ -1367,7 +1348,7 @@ class WorkerThread(Thread):
                 K5_pulse2_1 = K5_pulse2_2
                 retry_count -= 1
                 if(retry_count == 0):
-                    wx.PostEvent(self._notify_window, ResultEvent('FAIL ON Hi SPEED PULSE1 COUNT'))
+                    errStr = 'FAIL ON Hi SPEED PULSE1 COUNT'
                     DUT_LOG.error( "Fail on Hi Speed Pulse1 Count Not = 200 was %i" % (K5_pulse1_2 - K5_pulse1_1))
                     return
                 else:
@@ -1378,7 +1359,7 @@ class WorkerThread(Thread):
                 K5_pulse2_1 = K5_pulse2_2
                 retry_count -= 1
                 if(retry_count == 0):
-                    wx.PostEvent(self._notify_window, ResultEvent('FAIL ON Hi SPEED PULSE2 COUNT'))
+                    errStr = 'FAIL ON Hi SPEED PULSE2 COUNT'
                     DUT_LOG.error( "Fail on Hi Speed Pulse2 Count Not = 200 was %i" % (K5_pulse2_2 - K5_pulse2_1))
                     return 1
                 else:
@@ -1397,7 +1378,8 @@ class WorkerThread(Thread):
         
         if SD_CARD_VERSION != CURRENT_SD_VER and SD_CARD_VERSION != '2.5':
             # --- fixes pre 2.5 modbus test for old S2s
-            G20_C.write("sed -i 's/mbGot.find(\"MODBUS\\n\")/mbGot.find(\"MODBUS\")/'  test/FuncTest/BTL/btl485-FT.py\n")
+            #G20_C.write("sed -i 's/mbGot.find(\"MODBUS..\")/mbGot.find(\"MODBUS\")/'  test/FuncTest/BTL/btl485-FT.py\n")
+            G20_C.write("sed -i 's/mb.read(7)/mb.read(8)/' test/FuncTest/BTL/btl485-FT.py\n")
             G20_Cgot = ""
             while G20_Cgot.rfind("root@at91sam9g20ek:/var/smallfoot/smallfoot-app# ") == -1:
                 G20_Cgot += G20_C.readall()
@@ -1889,6 +1871,7 @@ class WorkerThread(Thread):
             print "Writting Key..."
             id_= None
             key = None
+            # Check for an issued Key if not then issue a new one.
             id_, key = keygen.issue_private_key( DUT_MAC )
             if key is None:
                 errStr = 'FAIL ON KEYGEN (call EnerNOC!!)'
@@ -2383,6 +2366,8 @@ class WorkerThread(Thread):
                 MUX_C.write(MUX_VALUE + "\r")
                 MUX_C.flush()
                 newMuxValue = MUX_C.read(3)             #get the echo 
+                if newMuxValue.rfind(MUX_VALUE) == -1 and retryCnt >= 1:
+                    time.sleep(0.7 * retryCnt)         # try to vary the time to help the retry work.
                 retryCnt += 1
             
             if newMuxValue.rfind(MUX_VALUE) == -1:
@@ -3188,11 +3173,15 @@ class theFrame(wx.Frame):
         FIRST_TEST_PASS = False
            
     #----------------------------------Handler for Programming Checkbox
-    def OnQuit(self, evt):
-        if self.worker:
+    def OnQuit(self, evt):    
+        try:
+            if self.worker: 
+                print "aborting for Quit"
+                self.worker.abort()                 #Flag the worker thread to stop if running
+            self.Destroy()
+        except:
             print "aborting for Quit"
-            self.worker.abort()                 #Flag the worker thread to stop if running
-        self.Destroy()
+            sys.exit(0)
         
     #----------------------------------Handler for Programming Checkbox
     def OnRestoreChck(self, evt):
@@ -3418,7 +3407,7 @@ class theFrame(wx.Frame):
             sX = DEVICE_TYPE
             # self.OnRestartBtn(self)      # TEST ONLY KGB
             
-            self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printed." + EOT_STR, "RESTART", "Re-Print1")
+            self.makePanel("%s TEST PASSED for %s!!" % (sX, DUT_MAC), "MAC Labels Printed. SD-VER:" + SD_CARD_VERSION + EOT_STR, "RESTART", "Re-Print1")
         else:
             print "Unhandled step %d" % TEST_STEP
             self.makePanel("SOFTWARE MALFUNCTION", "ERROR: UNKNOWN STEP", "RESTART", "Next")
