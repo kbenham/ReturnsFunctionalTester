@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import os
 import signal
 import logging
 import base64
@@ -7,7 +8,7 @@ import time
 import sqlite3
 from M2Crypto import RSA
 from threading import Event
-
+DB_DIR = "./keystoreDataBases/"
 DB_FILE = "keystore.db"
 STRENGTH = 1024
 EXPONENT = 65537
@@ -40,38 +41,56 @@ def gen_keys(count=10):
 
 def issue_private_key(mac=None):
     '''
-    Returns the next unused private key as a tuple in the form (key_id, PEM_string)
+    Search for the original key in the used kestore DataBases and return it, if it is not found
+    then return the next unused private key as a tuple in the form (key_id, PEM_string)
     Use like so:
     id, key = keygen.issue_private_key()
     # write key to the target device
     mac = '' # get the MAC from the target device
     keygen.record_key_used(id, mac) # this updates the database
     '''
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
     try:
+        c = None
+        conn = None
         if mac:
-            row = c.execute('select id,private_key from device_keys where issued_to_mac=? limit 1',
-                    (mac,)).fetchone()
-            if row: # return an already-issued key for this MAC if one has been given
-                id_, key = row
-                return id_, key 
-
+            # Search for the assigned Key in the used databases.
+            for DB in os.listdir(DB_DIR):
+                print "Searching for Mac: " + mac + " in kestore DataBase: " + DB
+                conn = sqlite3.connect(DB_DIR + DB)
+                c = conn.cursor()
+                row = c.execute('select id,private_key from device_keys where issued_to_mac=? limit 1',
+                        (mac,)).fetchone()
+                if row: # return an already-issued key for this MAC if one has been given
+                    print "Mac: " + mac + " found in kestore DataBase: " + DB
+                    id_, key = row
+                    return id_, key
+                c.close()
+                conn.close() 
+                c = None
+                conn = None
+                
+        # The old key was not found assign a new one.
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        print "Original key not found issuing a new key to MAC: " + mac
         row = c.execute('select id,private_key from device_keys where issued=0 limit 1',()).fetchone()
         if row is None:
             raise Exception("No more unused keys!")
-
+        
         id_, key = row
         c.execute('update device_keys set issued=1 where id=?',(id_,)) # make sure this doesn't get issued again.
         logging.debug("Issuing key %d", id_)
         conn.commit()
         return (id_, key)
-    except:
-        logging.exception("Error while issuing key!")
+    except Exception, e:
+        print "Error while issuing key! " + str(e)
+        logging.exception("Error while issuing key! " + str(e))
         conn.rollback()
     finally:
-        c.close()
-        conn.close()
+        if c != None:
+            c.close()
+            conn.close()
+        
     
 
 def record_key_used(id_, mac):
