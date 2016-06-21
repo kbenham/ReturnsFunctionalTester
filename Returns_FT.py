@@ -38,8 +38,8 @@ if MFG:
     
         # ['G20_TTY','RX_TTY','LIL_TTY','METER_TTY','MUX_TTY']
         S2_COMMS    = ['COM50',  None,   'COM51',  None,   'COM30']
-        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM30' ]
-        M2_COMMS    = ['COM96', 'COM77',  None,   'COM16', 'COM30' ]     
+        S2_C_COMMS  = ['COM78',  None,   'COM77', 'COM16', 'COM76' ]
+        M2_COMMS    = ['COM35', 'COM34',  None,   'COM16', 'COM33' ]     
         M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM16', 'COM30' ]
         
     else:   # Laptop
@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.1.0'                        # returns.py Version number. 
+VER = '1.1.1'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -459,12 +459,13 @@ class WorkerThread(Thread):
                 self.switchMux('00')    # Power OFF the DUT
                 # if M2 turn off USB power.
                 if DEVICE_TYPE == 'M2':
-                    self.M2_Power(S2_PWR_OFF)
+                    self.M2_Power(PWR_OFF)
                
         #+++++++++++++++++++++++++++++++++++++++
         else:
             print "never see this in run"
-            wx.PostEvent(self._notify_window, ResultEvent('FAIL ON BAD TEST_STEP'))
+            #wx.PostEvent(self._notify_window, ResultEvent('FAIL ON BAD TEST_STEP'))
+            errStr = 'FAIL ON BAD TEST_STEP'
             print "Restarting test Program!"
             python = sys.executable
             os.execl(python, python, *sys.argv)
@@ -478,6 +479,7 @@ class WorkerThread(Thread):
                 self.M2_Power(M2_USB_OFF)
                 
             wx.PostEvent(self._notify_window, ResultEvent(errStr))
+            
             DUT_LOG.error( errStr )
                 
         else:   # the test passed.
@@ -656,7 +658,7 @@ class WorkerThread(Thread):
         bootStat = self.BigRomBoot(10)
         if bootStat != 1:
             if bootStat != -2:              #USER ABORT IS -2
-                wx.PostEvent(self._notify_window, ResultEvent('FAIL ON RomBOOT'))
+                errStr ='FAIL ON RomBOOT'
             return 1
          
         MK_PANEL['TstDone'] = "RomBoot Good!! Device Booting!!"    
@@ -735,8 +737,9 @@ class WorkerThread(Thread):
                     print "Timeout on RomBOOT time: "  + str(time.time())
                     
                 print "[%d]:\n%s" % (len(BOOTLOG), BOOTLOG)
-            except:
-                print "NOTE THIS:  Bootlog NOT Printable"
+            except Exception, e:
+                print "Error in LinuxLogin! " + str(e)
+                print "\nNOTE THIS:  Bootlog NOT Printable"
             errStr = 'FAIL ON RomBOOT'
             
         if errStr == None:  # No ERRORS??
@@ -972,7 +975,7 @@ class WorkerThread(Thread):
         
         print "Testing Ethernet..."
         if BOOTLOG.rfind("No lease") != -1:
-            wx.PostEvent(self._notify_window, ResultEvent('FAIL ON ETHERNET (NO LEASE)'))
+            #wx.PostEvent(self._notify_window, ResultEvent('FAIL ON ETHERNET (NO LEASE)'))
             DUT_LOG.error( "Bootlog:\n%s" %BOOTLOG )    #Save Bootlog
             errStr = 'FAIL ON ETHERNET (NO LEASE)'
             return 1
@@ -1815,7 +1818,7 @@ class WorkerThread(Thread):
                             break    
             #'''  
             if errStr != None:
-                wx.PostEvent(self._notify_window, ResultEvent(errStr))
+                # wx.PostEvent(self._notify_window, ResultEvent(errStr))
                 return
             else: DUT_LOG.info( TEMP_LOG )
         
@@ -1843,8 +1846,8 @@ class WorkerThread(Thread):
             #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)
             if Cout.rfind("ERROR") != -1 or Cout.rfind("SUCCESS") == -1:
                 retry_count -= 1
-                if(retry_count == 0):
-                    wx.PostEvent(self._notify_window, ResultEvent('FAIL ON RELAYS'))
+                if(retry_count <= 0):
+                    errStr = 'FAIL ON RELAYS'
                     DUT_LOG.error( "Bad Relay Test:\n%s" % Cout )
                     return 1
                 else:
@@ -2142,12 +2145,12 @@ class WorkerThread(Thread):
             
         self.switchMux("70")                                # Turn on the battery voltage
         print "Testing RX Battery System Test..."
-        BatteryTimeOut = time.time() + 12
+        BatteryTimeOut = time.time() + 16
         RxResponse = ""
         RX_Cgot = self.SerialPortWrite(RX_C, "6")
         
         while RxResponse.rfind("\r") == -1: 
-            time.sleep(1)     
+            time.sleep(2)     
             RxResponse += RX_C.readall() 
             RxResponse.strip()
             if time.time() >= BatteryTimeOut:
@@ -2165,13 +2168,16 @@ class WorkerThread(Thread):
                     DUT_LOG.info( "RX Battery System Test Pass" )
                 else:
                     errStr = 'FAIL RX BATTERY SYSTEM READINGS: ' + RX_Cgot + \
-                            '\nLimits: 10-100, 830-870, 810-845, 500-560'
+                            '\nLimits: 10-100, 830-870, 810-845, 500-560' \
+                            '\nReadings: \nBatt1 = ' +  batt1 + 'Batt2 = ' + batt2 + \
+                            '\nBatt3 = ' + batt3 + 'Batt4 = ' + batt4
             
                 print "RX Battery System test took %d seconds" % (time.time() - timeStrt)
         
-            except:
+            except Exception, e:
+                print "Error while testing Battery circuit!\n" + str(e)
                 
-                errStr = "FAIL Incorrect response on Battery test" 
+                errStr = "FAIL Battery test ...\nError while testing Battery circuit!\n" + str(e)
              
         MK_PANEL['TstDone'] = "RX Battery System Good!!"  
         MK_PANEL['TstStart'] = "Testing RX Red LED... "
@@ -2339,9 +2345,10 @@ class WorkerThread(Thread):
                 win32print.WritePrinter(ZEBRA_DV, printStr)
                 win32print.EndDocPrinter(ZEBRA_DV)
                 DUT_LOG.info( "%d MAC LABELS PRINTED" % ZEBRA_LC)
-            except:
-                errStr = "FAIL BAR CODE LABEL PRINT"
-                wx.PostEvent(self._notify_window, ResultEvent('FAIL ON ZEBRA (call EnerNOC!!)'))
+            except Exception, e:
+                print "Error while Printing Barcode Lable! " + str(e)
+                errStr = "FAIL BAR CODE LABEL PRINT Error " + str(e)
+                # wx.PostEvent(self._notify_window, ResultEvent('FAIL ON ZEBRA (call EnerNOC!!)'))
                 return
             
         else:
@@ -2371,11 +2378,13 @@ class WorkerThread(Thread):
                 retryCnt += 1
             
             if newMuxValue.rfind(MUX_VALUE) == -1:
-                wx.PostEvent(self._notify_window, ResultEvent('FAILED MUX SWITCH UNPLUG & REPLUG USB CABLE'))
+                #wx.PostEvent(self._notify_window, ResultEvent('FAILED MUX SWITCH UNPLUG & REPLUG USB CABLE'))
+                errStr = 'FAILED MUX SWITCH UNPLUG & REPLUG USB CABLE'
                 return -1
             return 1
-        except:
-            print "FAILED MUX SWITCH COM Port TestStep: "  + str(TEST_STEP) + \
+        except Exception, e:
+            print "Error in MUX SWITCH! " + str(e)
+            print "\nFAILED MUX SWITCH COM Port TestStep: "  + str(TEST_STEP) + \
                   "\nTEST FIXTURE USB MAY NEED to be POWER CYCLED!!!"
             
        
@@ -2397,8 +2406,9 @@ class WorkerThread(Thread):
             else: 
                 return rettrn
        
-        except:
-            print "FAILED SerialPortWrite TestStep: " + str(TEST_STEP) + \
+        except Exception, e:
+            print "Error in SerialPortWrite! " + str(e)
+            print "\nFAILED SerialPortWrite TestStep: " + str(TEST_STEP) + \
                   "\nTEST FIXTURE USB MAY NEED to be POWER CYCLED!!!"
             
           
@@ -2534,7 +2544,8 @@ class WorkerThread(Thread):
                 if float(MeshResponse) > 10000000:
                     MeshResponse = "10000000"
       
-            except:
+            except Exception, e:
+                print "Error in ReadMeter! " + str(e)
                 MeshResponse = "---"
                 METER_INIT  = False
         #return the value
@@ -3430,7 +3441,7 @@ class theFrame(wx.Frame):
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
                 if DESKTOP:
-                    labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
                 else: # Laptop
                     labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
@@ -3450,9 +3461,9 @@ class theFrame(wx.Frame):
                 win32print.WritePrinter(ZEBRA_DV, printStr)
                 win32print.EndDocPrinter(ZEBRA_DV)
                 print "%d MAC LABEL PRINTED" % ZEBRA_LC
-            except:
-                print 'FAIL ON ZEBRA (call EnerNOC!!)'
-                errStr = "FAIL BAR CODE LABEL PRINT"
+            except Exception, e:
+                print "Error while Printing Barcode Lable! " + str(e)
+                errStr = "FAIL BAR CODE LABEL PRINT Error " + str(e)
                 return
             
         else:
@@ -3594,7 +3605,7 @@ class theFrame(wx.Frame):
                     return 1
                    
         else:
-            print "COM PORT SETUP FAILD: %s" % ERR_STR
+            print "COM PORT SETUP FAILED: %s" % ERR_STR
                       
         return ERR_STR
         
