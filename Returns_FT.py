@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.1.1'                        # returns.py Version number. 
+VER = '1.1.2'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -2145,7 +2145,7 @@ class WorkerThread(Thread):
             
         self.switchMux("70")                                # Turn on the battery voltage
         print "Testing RX Battery System Test..."
-        BatteryTimeOut = time.time() + 16
+        BatteryTimeOut = time.time() + 20
         RxResponse = ""
         RX_Cgot = self.SerialPortWrite(RX_C, "6")
         
@@ -2160,17 +2160,20 @@ class WorkerThread(Thread):
         if errStr == None:
             try:
                 batt1, batt2, batt3, batt4 = RxResponse.split(',')
-                
+                print 'Battery Readings: \nBatt1 = ' +  \
+                       batt1 + ' Batt2 = ' + batt2 + \
+                       '\nBatt3 = ' + batt3 + ' Batt4 = ' + batt4
+                       
                 if int(batt1) >= 10 and int(batt1) <= 120 and \
                    int(batt2) >= 830 and int(batt2) <= 870 and \
                    int(batt3) >= 810 and int(batt3) <= 845 and \
-                   int(batt4) >= 500 and int(batt4) <= 560:
+                   int(batt4) >= 500 and int(batt4) <= 700:
                     DUT_LOG.info( "RX Battery System Test Pass" )
                 else:
                     errStr = 'FAIL RX BATTERY SYSTEM READINGS: ' + RX_Cgot + \
-                            '\nLimits: 10-100, 830-870, 810-845, 500-560' \
-                            '\nReadings: \nBatt1 = ' +  batt1 + 'Batt2 = ' + batt2 + \
-                            '\nBatt3 = ' + batt3 + 'Batt4 = ' + batt4
+                            '\nLimits: 10-120, 830-870, 810-845, 500-700' \
+                            '\nReadings: \nBatt1 = ' +  batt1 + ' Batt2 = ' + batt2 + \
+                            '\nBatt3 = ' + batt3 + ' Batt4 = ' + batt4
             
                 print "RX Battery System test took %d seconds" % (time.time() - timeStrt)
         
@@ -3035,7 +3038,7 @@ class theFrame(wx.Frame):
     def OnDeviceTypeChck(self, evt):
         global DEVICE_TYPE, TestNames
         global G20_TTY, RX_TTY, LIL_TTY, METER_TTY, MUX_TTY
-        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS
+        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS, ZEBRA_LC
         
         ChBx = evt.GetEventObject()
         DT = ChBx.GetLabel()
@@ -3059,6 +3062,7 @@ class theFrame(wx.Frame):
             PortList = S2_C_COMMS 
         elif DT == 'M2':
             PortList = M2_COMMS
+            ZEBRA_LC = 2
         elif DT == 'M2_B':
             PortList = M2_B_COMMS
              
@@ -3441,7 +3445,7 @@ class theFrame(wx.Frame):
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
                 if DESKTOP:
-                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
                 else: # Laptop
                     labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
