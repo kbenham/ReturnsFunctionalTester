@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.1.2'                        # returns.py Version number. 
+VER = '1.1.3'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -988,14 +988,14 @@ class WorkerThread(Thread):
         
         print "Testing USB Disconnect/Reconnect..."
         
-        G20_Cgot = self.SerialPortWrite(G20_C, "echo 0 > /sys/class/gpio/tps_enable/value\n")
+        G20_Cgot = self.SerialPortWrite(G20_C, "echo 0 > /sys/class/gpio/tps_enable/value\n", 1)
         #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
         if G20_Cgot.rfind("usb 1-1: USB disconnect") == -1 or G20_Cgot.rfind("usb 1-2: USB disconnect") == -1:
             errStr = 'FAIL ON USB DISCONNECT'
             
         if errStr == None:  # No ERRORS??
             
-            G20_Cgot = self.SerialPortWrite(G20_C, "echo 1 > /sys/class/gpio/tps_enable/value\n")
+            G20_Cgot = self.SerialPortWrite(G20_C, "echo 1 > /sys/class/gpio/tps_enable/value\n", 1)
             #print "[%d]:%s" % (len(G20_Cgot), G20_Cgot)    #Debug Only
             if G20_Cgot.rfind("usb 1-1: new full speed USB device") == -1 or G20_Cgot.rfind("usb 1-2: new full speed USB device") == -1:
                 errStr = 'FAIL ON USB RECONNECT'
@@ -1723,7 +1723,7 @@ class WorkerThread(Thread):
         timeStrt = time.time()
         
         print "Testing RX EE Data..."
-        RX_Cgot = self.SerialPortWrite(RX_C, "\r")        # Clear first String.
+        RX_Cgot = self.SerialPortWrite(RX_C, "\r")        
         RX_Cgot = self.SerialPortWrite(RX_C, "3")         # Run Test.
         
         if RX_Cgot.rfind("Ok") != -1 :
@@ -2055,7 +2055,7 @@ class WorkerThread(Thread):
         global errStr, DUT_LOG, RX_C
         timeStrt = time.time()
         print "Testing RX HV input and output..."
-        RX_Cgot = self.SerialPortWrite(RX_C, "\r")          # Clear first String.
+        RX_Cgot = self.SerialPortWrite(RX_C, "\r")          # Make sure it is in MFG mode.
         RX_Cgot = self.SerialPortWrite(RX_C, "0")         # Run the HV Out/In test.
         InOutTimeOut = time.time() + 12
         RxRpnse = ""
@@ -2083,8 +2083,11 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_Rx_DigInOut(self):
-        global errStr, DUT_LOG, RX_C
+        global errStr, DUT_LOG, RX_C, CUST_TEST
         timeStrt = time.time()
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2)          # Make sure it is in MFG mode.
+            
         print "Testing RX Out2 and Dig Inputs 1, 2..."
         RX_Cgot = self.SerialPortWrite(RX_C, "1", 2)         # Run the Output2 and Digital Inputs test.
       
@@ -2092,7 +2095,7 @@ class WorkerThread(Thread):
             DUT_LOG.info("RX Out2 & Dig Inputs 1 & 2 test Pass")
         else:
             errStr = 'FAIL RX OUT2 and DIG IN 1, 2 the States = ' + RX_Cgot
-         
+            return 1
         print "RX Out2 and Dig Inputs 1, 2 test took %d seconds" % (time.time() - timeStrt)    
              
         MK_PANEL['TstDone'] = "RX Out2 and Dig Inputs 1, 2 Good!!"  
@@ -2103,9 +2106,11 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_AnalogIns(self):
-        global errStr, DUT_LOG, RX_C
+        global errStr, DUT_LOG, RX_C, CUST_TEST
         timeStrt = time.time()
         print "Testing RX Analog inputs 1-4..."
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2)          # Make sure it is in MFG mode.
     
         RX_Cgot = self.SerialPortWrite(RX_C, "2")         # Run the Analog inputs 1-4v test.                                                      
         An1, An2, An3, An4 = RX_Cgot.split(',')             # Assume Zero on analog inputs.
@@ -2127,8 +2132,10 @@ class WorkerThread(Thread):
                 self.switchMux('20')                        # Take +5VDC off the analog inputs.
             else:
                 errStr = 'FAIL RX ANALOG INs AT 5VDC READ: ' + RX_Cgot + 'COUNT LIMITS: ' + str(LoLimit) + ', ' + str(HiLimit)
+                return 1
         else:
             errStr = 'FAIL RX ANALOG INs AT 0VDC READ: ' + RX_Cgot + 'COUNT LIMIT: 10'
+            return 1
             
         print "RX Analog inputs 1-4 test took %d seconds" % (time.time() - timeStrt) 
              
@@ -2139,20 +2146,27 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_Battery(self):
-        global errStr, DUT_LOG, RX_C
+        global errStr, DUT_LOG, RX_C, CUST_TEST
         
         timeStrt = time.time()
             
         self.switchMux("70")                                # Turn on the battery voltage
         print "Testing RX Battery System Test..."
-        BatteryTimeOut = time.time() + 20
+        BatteryTimeOut = time.time() + 10
         RxResponse = ""
-        RX_Cgot = self.SerialPortWrite(RX_C, "6")
+      
+        RX_Cgot = self.SerialPortWrite(RX_C, "\r")          # Make sure it is in MFG mode.
+        if RX_Cgot.rfind('System Start up from Power On reset') != -1: # Did it go out MFG mode?
+            while RX_Cgot.rfind('Manufacture Test Mode>') == -1:
+                RX_Cgot = self.SerialPortWrite(RX_C, "\r", 1)          # YES... put it back in MFG mode.
+            
+        RX_Cgot = self.SerialPortWrite(RX_C, "6", 6)
+        RxResponse = RX_Cgot
         
-        while RxResponse.rfind("\r") == -1: 
-            time.sleep(2)     
+        while len(RxResponse) < 4: # RxResponse.rfind("\r") == -1: 
             RxResponse += RX_C.readall() 
             RxResponse.strip()
+            
             if time.time() >= BatteryTimeOut:
                 errStr= "FAIL BATTERY SYSTEM READ TIMEOUT"       
                 break
@@ -2174,6 +2188,7 @@ class WorkerThread(Thread):
                             '\nLimits: 10-120, 830-870, 810-845, 500-700' \
                             '\nReadings: \nBatt1 = ' +  batt1 + ' Batt2 = ' + batt2 + \
                             '\nBatt3 = ' + batt3 + ' Batt4 = ' + batt4
+                    return 1
             
                 print "RX Battery System test took %d seconds" % (time.time() - timeStrt)
         
@@ -2181,6 +2196,7 @@ class WorkerThread(Thread):
                 print "Error while testing Battery circuit!\n" + str(e)
                 
                 errStr = "FAIL Battery test ...\nError while testing Battery circuit!\n" + str(e)
+                return 1
              
         MK_PANEL['TstDone'] = "RX Battery System Good!!"  
         MK_PANEL['TstStart'] = "Testing RX Red LED... "
@@ -2189,18 +2205,20 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_RxRedLED(self):
-        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX
+        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX, CUST_TEST
         timeStrt = time.time()
         print "Testing RX Red LED Test..."
         
         #'''
         self.switchMux("2D")                            # Hook to the LED Junction D19
-        
-        RX_Cgot = self.SerialPortWrite(RX_C, "7")         # Run Test.
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2)          # Make sure it is in MFG mode.
+            
+        RX_Cgot = self.SerialPortWrite(RX_C, "7", 1)         # Run Test.
         
         if RX_Cgot.rfind('Ok') != -1 :
             Reading = self.ReadMeter("DC")               # Read the DC Volts.
-            
+            print "Red LED Voltage: " + Reading + "VDC \nLimit Lo: " + str(M2_LEDMIN) + " Limit Hi: " + str(M2_LEDMAX)
             if Reading == "---":                         # No reading was recieved.
                 errStr = "FAIL RX Red LED No Meter Reading: ---"
             elif float(Reading) >= M2_LEDMIN and float(Reading) <= M2_LEDMAX:
@@ -2208,8 +2226,10 @@ class WorkerThread(Thread):
             else:
                 errStr = 'FAIL RX Red LED Test Reading: ' + Reading + UNITS + \
                          '\nLimits: ' + str(M2_LEDMIN) + "-" + str(M2_LEDMAX) + UNITS  
+                return 1
         else:
             errStr = 'FAIL RX Red LED Test RX Bad Response' 
+            return 1
         #'''
         print "RX Red LED test took %d seconds" % (time.time() - timeStrt)            
               
@@ -2220,27 +2240,31 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #
     def M2_RxGreenLED(self):
-        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX
+        global errStr, DUT_LOG, RX_C, M2_LEDMIN, M2_LEDMAX, CUST_TEST
         
         timeStrt = time.time()
         print "Testing RX Green LED Test..."
         #'''
         self.switchMux("2E")                            # Hook to the LED Junction D20
-        
-        RX_Cgot = self.SerialPortWrite(RX_C, "8")       # Run Test.
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2)          # Make sure it is in MFG mode.
+            
+        RX_Cgot = self.SerialPortWrite(RX_C, "8",1)       # Run Test.
         
         if RX_Cgot.rfind('Ok') != -1 :
             Reading = self.ReadMeter("DC")              # Read the DC Volts.
-            
+            print "Green LED Voltage: " + Reading + "VDC \nLimit Lo: " + str(M2_LEDMIN) + " Limit Hi: " + str(M2_LEDMAX)
             if Reading == "---":                         # No reading was recieved.
                 errStr = "FAIL RX Green LED No Meter Reading: ---"
             elif float(Reading) >= M2_LEDMIN and float(Reading) <= M2_LEDMAX:
                 DUT_LOG.info( "RX Green LED Test Pass" )
             else:
                 errStr = 'FAIL RX Green LED Reading: ' + Reading + UNITS + \
-                         '\nLimits:  ' + str(M2_LEDMIN) + "-" + str(M2_LEDMAX) + UNITS               
+                         '\nLimits:  ' + str(M2_LEDMIN) + "-" + str(M2_LEDMAX) + UNITS      
+                return 1         
         else:
             errStr = 'FAIL RX Green LED Test RX Bad Response'
+            return 1
         #'''
         print "RX Green LED Test test took %d seconds" % (time.time() - timeStrt) 
              
@@ -2257,9 +2281,9 @@ class WorkerThread(Thread):
         print "Testing RX Power LED Test..."
         #'''
         self.switchMux("2C")
-      
-        Reading = self.ReadMeter("DC")               # Read the DC Volts.
         
+        Reading = self.ReadMeter("DC")               # Read the DC Volts.
+        print "PWR LED Voltage: " + Reading + "VDC \nLimit Lo: " + str(M2_LEDMIN) + " Limit Hi: " + str(M2_LEDMAX)
         if Reading == "---":                         # No reading was recieved.
             errStr = "FAIL RX Power LED No Meter Reading: ---"
         elif float(Reading) >= M2_LEDMIN and float(Reading) <= M2_LEDMAX:
@@ -2267,6 +2291,7 @@ class WorkerThread(Thread):
         else:
             errStr = 'FAIL RX Power LED Reading: ' + Reading + UNITS + \
                      '\nLimits:  ' + str(M2_LEDMIN) + "-" + str(M2_LEDMAX) + UNITS                
+            return 1
         
         print "RX Power LED Test test took %d seconds" % (time.time() - timeStrt) 
         
@@ -2890,7 +2915,7 @@ class theFrame(wx.Frame):
             
             
                 
-            ChBxLb = wx.CheckListBox(G_PAN_ID, CH_LB_ID, (0, 20), wx.Size(100, 140), TestNames)
+            ChBxLb = wx.CheckListBox(G_PAN_ID, CH_LB_ID, (0, 20), wx.Size(120, 140), TestNames)
                 
             self.Bind(wx.EVT_CHECKLISTBOX, self.EvtCheckListBox, ChBxLb)
             
@@ -2963,7 +2988,7 @@ class theFrame(wx.Frame):
     def OnCheckDone(self, evt):
         global DEVICE_TYPE, TEST_STEP, G_PAN_ID
         global G20_TTY, RX_TTY, LIL_TTY, METER_TTY, MUX_TTY
-        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS
+        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS,ZEBRA_LC
         
         
 
@@ -2990,6 +3015,8 @@ class theFrame(wx.Frame):
             PortList = S2_C_COMMS 
         elif DT == 'M2':
             PortList = M2_COMMS
+            if MFG:
+                ZEBRA_LC = 2
         elif DT == 'M2_B':
             PortList = M2_B_COMMS
              
@@ -3038,7 +3065,7 @@ class theFrame(wx.Frame):
     def OnDeviceTypeChck(self, evt):
         global DEVICE_TYPE, TestNames
         global G20_TTY, RX_TTY, LIL_TTY, METER_TTY, MUX_TTY
-        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS, ZEBRA_LC
+        global S2_COMMS, S2_C_COMMS, M2_COMMS, M2_B_COMMS, ZEBRA_LC, MFG
         
         ChBx = evt.GetEventObject()
         DT = ChBx.GetLabel()
@@ -3062,7 +3089,8 @@ class theFrame(wx.Frame):
             PortList = S2_C_COMMS 
         elif DT == 'M2':
             PortList = M2_COMMS
-            ZEBRA_LC = 2
+            if MFG:
+                ZEBRA_LC = 2
         elif DT == 'M2_B':
             PortList = M2_B_COMMS
              
