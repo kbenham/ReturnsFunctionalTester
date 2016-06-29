@@ -63,7 +63,7 @@ else:   # Engineering
     M2_COMMS    = ['COM96', 'COM94',  None,   'COM6', 'COM95' ]     
     M2_B_COMMS  = ['COM91', 'COM77',  None,   'COM6', 'COM76' ]
 
-VER = '1.1.3'                        # returns.py Version number. 
+VER = '1.1.4'                        # returns.py Version number. 
 CURRENT_SD_VER  = "2.6.1"            # The latest Release version.
 SD_CARD_VERSION = ""                # The Version of SD=CARD on the UUT.
 KEY_RESTORED    = False                # if the old gets restore don't write another rsa key.
@@ -863,6 +863,7 @@ class WorkerThread(Thread):
         SD_CARD_VERSION = s.strip(' \t\n\r')
         
         print 'SD-CARD Version: '+ SD_CARD_VERSION
+        DUT_LOG.info( "Device SD-CARD Version: %s" % SD_CARD_VERSION )
         
         #---------------If Restore selected Copy the rsa_key.pem ---------------
         if RESTORE_KEY:
@@ -1411,10 +1412,13 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #         Rx Temperature test
     def Rx_Temp(self):
-        global errStr, DUT_LOG, RX_C
+        global errStr, DUT_LOG, RX_C, CUST_TEST
         timeStrt = time.time()
         
         print "Testing RX Temperature Sensor..."
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2) # Make sure it is in MFG mode.
+            
         RX_Cgot = self.SerialPortWrite(RX_C, "4")         # Run Test.
         
         if int(RX_Cgot) >= 200 and int(RX_Cgot) <= 400 :
@@ -1434,9 +1438,12 @@ class WorkerThread(Thread):
     #---------------------------------------------------------------------
     #       RX AC Power Reading On & Off Backup CAP test
     def Rx_AcReadBrownOut(self): 
-        global errStr, DUT_LOG, RX_C  
+        global errStr, DUT_LOG, RX_C, CUST_TEST  
         timeStrt = time.time()
         print "Testing RX AC Power Reading AC On..."
+        if CUST_TEST:
+            RX_Cgot = self.SerialPortWrite(RX_C, "\r", 2) # Make sure it is in MFG mode.
+            
         RX_Cgot = self.SerialPortWrite(RX_C, "5")         # Run Test. assume the power is on.
         
         if DEVICE_TYPE == 'M2_B':
@@ -3473,7 +3480,7 @@ class theFrame(wx.Frame):
                     macNoSepSTR = macNoSepSTR + DUT_MAC[i]
             if MFG:
                 if DESKTOP:
-                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
+                    labelStr = "^XA^FO140,15^BY2^BCN,61,N,N,N^FD%s^FS^FO200,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
                 else: # Laptop
                     labelStr = "^XA^FO038,15^BY2^BCN,61,N,N,N^FD%s^FS^FO110,80^ADN36,20^FD%s^FS^XZ" % (macNoSepSTR, DUT_MAC)
             else:
